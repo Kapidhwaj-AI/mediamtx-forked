@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/bluenviron/mediamtx/internal/auth"
 	"github.com/bluenviron/mediamtx/internal/conf"
@@ -110,6 +111,13 @@ func (pm *pathManager) initialize() {
 
 	pm.wg.Add(1)
 	go pm.run()
+}
+
+func (pm *pathManager) changeRecordingDuration(time_ conf.StringDuration) {
+	for _, pa := range pm.paths {
+		//pa.recordAgent.PartDuration = time.Duration(time_)
+		pa.recorder.SegmentDuration = time.Duration(time_)
+	}
 }
 
 func (pm *pathManager) close() {

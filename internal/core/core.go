@@ -4,7 +4,9 @@ package core
 import (
 	"context"
 	_ "embed"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -37,6 +39,7 @@ import (
 //go:generate go run ./versiongetter
 
 //go:embed VERSION
+
 var version []byte
 
 var defaultConfPaths = []string{
@@ -81,6 +84,28 @@ type Core struct {
 
 	// out
 	done chan struct{}
+}
+
+var p *Core
+
+type MyRequest struct {
+	Time conf.StringDuration `json:"time"`
+}
+
+func ChangeRecordingDuration(time_ conf.StringDuration) {
+	p.pathManager.changeRecordingDuration(time_)
+}
+
+func changeDuration(w http.ResponseWriter, r *http.Request) {
+
+	var req MyRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	p.logger.Log(logger.Info, "Changing recording duration to %s", req.Time)
+	ChangeRecordingDuration(req.Time)
 }
 
 // New allocates a Core.
@@ -134,6 +159,10 @@ func New(args []string) (*Core, bool) {
 		p.closeResources(nil, false)
 		return nil, false
 	}
+
+	http.HandleFunc("/changeDuration", changeDuration)
+	fmt.Println("Server is running on port 8080")
+	http.ListenAndServe(":8080", nil)
 
 	go p.run()
 

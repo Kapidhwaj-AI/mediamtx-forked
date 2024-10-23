@@ -38,7 +38,7 @@ import (
 
 //go:generate go run ./versiongetter
 
-//go:embed VERSION
+// go:embed VERSION
 
 var version []byte
 

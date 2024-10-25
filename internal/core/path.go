@@ -793,6 +793,8 @@ func (pa *path) checkRecording() (int, error) {
 	// 	}
 	// }
 	// pa.Log(logger.Info, "Before ping")
+	pa.Log("DB starting")
+        pa.Log(DB)
 	err := DB.Ping()
 	// pa.Log(logger.Info, "Ping error: %v", err)
 	if err != nil {
@@ -861,12 +863,12 @@ func (pa *path) startRecording() {
 		OnSegmentComplete: func(segmentPath string, segmentDuration time.Duration) {
 			pa.Log(logger.Info, "onsesgmentcomplete called0")
 			if pa.conf.RunOnRecordSegmentComplete != "" {
-				pa.Log(logger.Info, "onsesgmentcomplete called1")
+				pa.Log(logger.Info, "onsesgmentcomplete called01")
 				env := pa.ExternalCmdEnv()
-				pa.Log(logger.Info, "onsesgmentcomplete called2")
+				pa.Log(logger.Info, "onsesgmentcomplete called02")
 				env["MTX_SEGMENT_PATH"] = segmentPath
 				env["MTX_SEGMENT_DURATION"] = strconv.FormatFloat(segmentDuration.Seconds(), 'f', -1, 64)
-				pa.Log(logger.Info, "onsesgmentcomplete called3")
+				pa.Log(logger.Info, "onsesgmentcomplete called03")
 
 				isRecord, err := pa.checkRecording()
 				pa.Log(logger.Info, "onsesgmentcomplete called4")

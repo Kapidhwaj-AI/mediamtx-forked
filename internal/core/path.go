@@ -793,8 +793,8 @@ func (pa *path) checkRecording() (int, error) {
 	// 	}
 	// }
 	// pa.Log(logger.Info, "Before ping")
-	pa.Log("DB starting")
-        pa.Log(DB)
+	pa.Log(logger.Info, "DB starting")
+        // pa.Log(DB)
 	err := DB.Ping()
 	// pa.Log(logger.Info, "Ping error: %v", err)
 	if err != nil {

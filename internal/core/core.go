@@ -38,7 +38,7 @@ import (
 
 //go:generate go run ./versiongetter
 
-//go:embed VERSION
+// var version = "v0.0.0"
 
 var version []byte
 
@@ -255,6 +255,16 @@ func (p *Core) createResources(initial bool) error {
 
 	if initial {
 		p.Log(logger.Info, "MediaMTX %s", version)
+
+		msg, err := ConnectWithSql()
+		if err != nil {
+			p.Log(logger.Error, "Error connecting to MySQL database")
+			//return err
+		}
+
+		if msg == "Success" {
+			p.Log(logger.Info, "Connected to MySQL database")
+		}
 
 		if p.confPath != "" {
 			a, _ := filepath.Abs(p.confPath)

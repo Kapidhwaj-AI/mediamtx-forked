@@ -14,12 +14,12 @@ logDestinations: [stdout]
 logFile: mediamtx.log
 
 # Timeout of read operations.
-readTimeout: 10s
+readTimeout: 15s
 # Timeout of write operations.
 writeTimeout: 10s
 # Size of the queue of outgoing packets.
 # A higher value allows to increase throughput, a lower value allows to save RAM.
-writeQueueSize: 512
+writeQueueSize: 1024
 # Maximum size of outgoing UDP packets.
 # This can be decreased to avoid fragmentation on networks with a low UDP MTU.
 udpMaxPayloadSize: 1472
@@ -262,7 +262,7 @@ rtspAuthMethods: [basic]
 # Enable publishing and reading streams with the RTMP protocol.
 rtmp: yes
 # Address of the RTMP listener. This is needed only when encryption is "no" or "optional".
-rtmpAddress: :1935
+rtmpAddress: :1937
 # Encrypt connections with TLS (RTMPS).
 # Available values are "no", "strict", "optional".
 rtmpEncryption: "no"
@@ -343,14 +343,14 @@ webrtc: yes
 # Address of the WebRTC HTTP listener.
 webrtcAddress: :8889
 # Enable TLS/HTTPS on the WebRTC server.
-webrtcEncryption: no
+webrtcEncryption: yes
 # Path to the server key.
 # This can be generated with:
 # openssl genrsa -out server.key 2048
 # openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
-webrtcServerKey: server.key
+webrtcServerKey: /home/queries/certs/server.key
 # Path to the server certificate.
-webrtcServerCert: server.crt
+webrtcServerCert: /home/queries/certs/server.crt
 # Value of the Access-Control-Allow-Origin header provided in every HTTP response.
 # This allows to play the WebRTC stream from an external website.
 webrtcAllowOrigin: '*'
@@ -372,7 +372,7 @@ webrtcIPsFromInterfaces: yes
 # An empty value means to use all available interfaces.
 webrtcIPsFromInterfacesList: []
 # List of additional hosts or IPs to send to clients.
-webrtcAdditionalHosts: []
+webrtcAdditionalHosts: [34.56.93.42]
 # ICE servers. Needed only when local listeners can't be reached by clients.
 # STUN servers allows to obtain and share the public IP of the server.
 # TURN/TURNS servers forces all traffic through them.
@@ -459,17 +459,17 @@ pathDefaults:
   recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   # Format of recorded segments.
   # Available formats are "fmp4" (fragmented MP4) and "mpegts" (MPEG-TS).
-  recordFormat: fmp4
+  recordFormat: mpegts
   # fMP4 segments are concatenation of small MP4 files (parts), each with this duration.
   # MPEG-TS segments are concatenation of 188-bytes packets, flushed to disk with this period.
   # When a system failure occurs, the last part gets lost.
   # Therefore, the part duration is equal to the RPO (recovery point objective).
-  recordPartDuration: 1s
+  recordPartDuration: 30s
   # Minimum duration of each segment.
-  recordSegmentDuration: 1h
+  recordSegmentDuration: 30s
   # Delete segments after this timespan.
   # Set to 0s to disable automatic deletion.
-  recordDeleteAfter: 24h
+  recordDeleteAfter: 30s
 
   ###############################################
   # Default path settings -> Publisher source (when source is "publisher")
@@ -684,7 +684,7 @@ pathDefaults:
   #   a regular expression.
   # * MTX_SEGMENT_PATH: segment file path
   # * MTX_SEGMENT_DURATION: segment duration
-  runOnRecordSegmentComplete:
+  runOnRecordSegmentComplete: rclone copy --gcs-bucket-policy-only --min-age=1ms ./recordings remote:/kapibucket2
 
 ###############################################
 # Path settings

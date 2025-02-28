@@ -794,7 +794,7 @@ func (pa *path) checkRecording() (int, error) {
 	// }
 	// pa.Log(logger.Info, "Before ping")
 	pa.Log(logger.Info, "DB starting")
-        // pa.Log(DB)
+	// pa.Log(DB)
 	err := DB.Ping()
 	// pa.Log(logger.Info, "Ping error: %v", err)
 	if err != nil {
@@ -836,6 +836,52 @@ func (pa *path) checkRecording() (int, error) {
 		//return "", nil
 	}
 	return 0, nil
+}
+
+func (pa *path) insertMetaData(clippath string, camId string) error {
+	err := DB.Ping()
+
+	pa.Log(logger.Info, "Before ping clippath: %s ", clippath)
+	pa.Log(logger.Info, "Before ping camId: %s ", camId)
+	if err != nil {
+
+		pa.Log(logger.Info, "DB connection failed")
+		msg, err := ConnectWithSql()
+		if msg == "success" {
+			pa.Log(logger.Info, "DB connection success")
+		} else {
+			pa.Log(logger.Info, "DB connection failed")
+			return err
+		}
+		if err != nil {
+
+			pa.Log(logger.Info, "DB connection failed")
+			return err
+		}
+	}
+	utctimestamp := time.Now().Unix()
+
+	query := "INSERT INTO recorded_clips(camera_id, utc_stamp,recorded_path) VALUES (?, ?,?)"
+	ctx, cancelfunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelfunc()
+	stmt, err := DB.PrepareContext(ctx, query)
+	if err != nil {
+		pa.Log(logger.Error, "Error %s when preparing SQL statement", err)
+		return err
+	}
+	defer stmt.Close()
+	res, err := stmt.ExecContext(ctx, camId, utctimestamp, clippath)
+	if err != nil {
+		pa.Log(logger.Error, "Error %s when inserting row into recorded clips table", err)
+		return err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		pa.Log(logger.Error, "Error %s when finding rows affected", err)
+		return err
+	}
+	pa.Log(logger.Info, "%d recording metadata added ", rows)
+	return nil
 }
 
 func (pa *path) startRecording() {
@@ -888,6 +934,17 @@ func (pa *path) startRecording() {
 						false,
 						env,
 						nil)
+					string1 := strings.TrimLeft(parts[1], " ")
+
+					// Remove ./recordings/ from string2
+					string2 := strings.Replace(segmentPath, "./recordings/", "", 1)
+
+					// Combine the two strings
+					clippath := string1 + "/" + string2
+					err := pa.insertMetaData(clippath, pa.name)
+					if err != nil {
+						pa.Log(logger.Info, "Error in inserting metadata")
+					}
 				}
 			}
 		},

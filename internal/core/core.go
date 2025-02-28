@@ -11,6 +11,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"time"
 
@@ -96,6 +97,87 @@ func ChangeRecordingDuration(time_ conf.StringDuration) {
 	p.pathManager.changeRecordingDuration(time_)
 }
 
+func startRecordingStream(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
+
+	// Get file info
+	file, err := os.Open(path)
+	if err != nil {
+		http.Error(w, "File not found", http.StatusNotFound)
+		return
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		http.Error(w, "Unable to get file info", http.StatusInternalServerError)
+		return
+	}
+	fileSize := stat.Size()
+
+	rangeHeader := r.Header.Get("Range")
+	if rangeHeader != "" {
+		// Parse the Range header
+		parts := strings.Split(strings.Replace(rangeHeader, "bytes=", "", 1), "-")
+		start, _ := strconv.ParseInt(parts[0], 10, 64)
+		var end int64
+		if parts[1] != "" {
+			end, _ = strconv.ParseInt(parts[1], 10, 64)
+		} else {
+			end = fileSize - 1
+		}
+
+		if start > end || start < 0 || end >= fileSize {
+			http.Error(w, "Invalid range", http.StatusRequestedRangeNotSatisfiable)
+			return
+		}
+
+		chunkSize := end - start + 1
+
+		// Set response headers
+		w.Header().Set("Content-Range", "bytes "+strconv.FormatInt(start, 10)+"-"+strconv.FormatInt(end, 10)+"/"+strconv.FormatInt(fileSize, 10))
+		w.Header().Set("Accept-Ranges", "bytes")
+		w.Header().Set("Content-Length", strconv.FormatInt(chunkSize, 10))
+		w.Header().Set("Content-Type", "application/typescript")
+		w.WriteHeader(http.StatusPartialContent)
+
+		// Stream the requested range
+		file.Seek(start, 0)
+		buffer := make([]byte, 1024*1024) // 1MB buffer
+		bytesToRead := chunkSize
+
+		for bytesToRead > 0 {
+			readSize := int64(len(buffer))
+			if bytesToRead < readSize {
+				readSize = bytesToRead
+			}
+
+			n, err := file.Read(buffer[:readSize])
+			if err != nil {
+				break
+			}
+
+			w.Write(buffer[:n])
+			bytesToRead -= int64(n)
+		}
+	} else {
+		// Set response headers for full file
+		w.Header().Set("Content-Length", strconv.FormatInt(fileSize, 10))
+		w.Header().Set("Content-Type", "application/typescript")
+		w.WriteHeader(http.StatusOK)
+
+		// Stream the full file
+		buffer := make([]byte, 1024*1024) // 1MB buffer
+		for {
+			n, err := file.Read(buffer)
+			if err != nil {
+				break
+			}
+			w.Write(buffer[:n])
+		}
+	}
+}
+
 func changeDuration(w http.ResponseWriter, r *http.Request) {
 
 	var req MyRequest
@@ -160,6 +242,7 @@ func New(args []string) (*Core, bool) {
 		return nil, false
 	}
 
+	http.HandleFunc("/playRecording", startRecordingStream)
 	http.HandleFunc("/changeDuration", changeDuration)
 	fmt.Println("Server is running on port 8080")
 	http.ListenAndServe(":8080", nil)

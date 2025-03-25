@@ -16,7 +16,7 @@ var err error
 func ConnectWithSql() (string, error) {
 
 	log.Print("Connecting to MySQL database...")
-	DB, err = sql.Open("mysql", fmt.Sprintf("clientdbuser:ClientDBUserKaPassword@tcp(%s:%s)/newclientDB", "35.232.220.60", "3306"))
+	DB, err = sql.Open("mysql", fmt.Sprintf("root:ClientDBUserKaPassword@tcp(%s:%s)/newclientDB", "10.23.112.6", "3306"))
 	if err != nil {
 		// Logger.Fatal(err)
 		return "", err

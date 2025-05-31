@@ -1,0 +1,247 @@
+2025/05/30 13:47:17 INF MediaMTX 
+2025/05/30 13:47:18 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 13:47:18 ERR listen udp :8000: bind: address already in use
+2025/05/30 13:47:18 INF waiting for running hooks
+2025/05/30 14:03:05 INF MediaMTX 
+2025/05/30 14:03:07 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 14:03:07 ERR listen udp :8000: bind: address already in use
+2025/05/30 14:03:07 INF waiting for running hooks
+2025/05/30 15:43:52 INF MediaMTX 
+2025/05/30 15:43:54 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 15:43:54 INF [RTSP] listener opened on :8554 (TCP), :8000 (UDP/RTP), :8001 (UDP/RTCP)
+2025/05/30 15:43:54 INF [RTMP] listener opened on :1935
+2025/05/30 15:43:54 INF [HLS] listener opened on :8888
+2025/05/30 15:43:54 INF [WebRTC] listener opened on :8889 (HTTP), :8189 (ICE/UDP)
+2025/05/30 15:43:54 INF [SRT] listener opened on :8890 (UDP)
+2025/05/30 15:58:29 INF [RTSP] [conn [::1]:36118] opened
+2025/05/30 15:58:29 INF [RTSP] [session d4a3aeb1] created by [::1]:36118  
+
+2025/05/30 15:58:29 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 15:58:29 INF [RTSP] [session d4a3aeb1] is publishing to path '635', 2 tracks (H264, Opus)
+2025/05/30 15:58:41 INF [RTSP] [conn [::1]:36118] closed: 
+2025/05/30 15:58:51 INF [path 635] [recorder] recording stopped
+2025/05/30 15:58:51 INF [path 635] onsesgmentcomplete called0
+2025/05/30 15:58:51 INF [path 635] onsesgmentcomplete called01
+2025/05/30 15:58:51 INF [path 635] onsesgmentcomplete called02
+2025/05/30 15:58:51 INF [path 635] onsesgmentcomplete called03
+2025/05/30 15:58:51 INF [path 635] DB starting
+2025/05/30 16:25:19 INF MediaMTX 
+2025/05/30 16:25:20 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 16:25:20 INF [RTSP] listener opened on :8554 (TCP), :8000 (UDP/RTP), :8001 (UDP/RTCP)
+2025/05/30 16:25:20 INF [RTMP] listener opened on :1935
+2025/05/30 16:25:20 INF [HLS] listener opened on :8888
+2025/05/30 16:25:20 INF [WebRTC] listener opened on :8889 (HTTP), :8189 (ICE/UDP)
+2025/05/30 16:25:20 INF [SRT] listener opened on :8890 (UDP)
+2025/05/30 16:25:50 INF [RTSP] [conn [::1]:54176] opened
+2025/05/30 16:25:50 INF [RTSP] [session 4ebc1901] created by [::1]:54176
+2025/05/30 16:25:50 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:25:50 INF [RTSP] [session 4ebc1901] is publishing to path '635', 2 tracks (H264, Opus)
+2025/05/30 16:25:51 ERR [path 635] [recorder] open ./recordings/635/2025-05-30_16-25-50-215259.mp4: permission denied
+2025/05/30 16:25:53 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:25:54 ERR [path 635] [recorder] open ./recordings/635/2025-05-30_16-25-56-429425.mp4: permission denied
+2025/05/30 16:25:56 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:25:57 ERR [path 635] [recorder] open ./recordings/635/2025-05-30_16-26-02-665436.mp4: permission denied
+2025/05/30 16:25:59 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:26:00 ERR [path 635] [recorder] open ./recordings/635/2025-05-30_16-26-08-820623.mp4: permission denied
+2025/05/30 16:26:07 INF MediaMTX 
+2025/05/30 16:26:08 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 16:26:08 INF [RTSP] listener opened on :8554 (TCP), :8000 (UDP/RTP), :8001 (UDP/RTCP)
+2025/05/30 16:26:08 INF [RTMP] listener opened on :1935
+2025/05/30 16:26:08 INF [HLS] listener opened on :8888
+2025/05/30 16:26:08 INF [WebRTC] listener opened on :8889 (HTTP), :8189 (ICE/UDP)
+2025/05/30 16:26:08 INF [SRT] listener opened on :8890 (UDP)
+2025/05/30 16:26:27 INF [RTSP] [conn [::1]:47404] opened
+2025/05/30 16:26:27 INF [RTSP] [session 4c878b05] created by [::1]:47404
+2025/05/30 16:26:27 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:26:27 INF [RTSP] [session 4c878b05] is publishing to path '635', 2 tracks (H264, Opus)
+2025/05/30 16:26:37 INF [RTSP] [conn [::1]:47404] closed: terminated
+2025/05/30 16:26:37 INF [path 635] [recorder] recording stopped
+2025/05/30 16:26:37 INF [RTSP] [session 4c878b05] destroyed: session timed out
+2025/05/30 16:27:32 INF [RTSP] [conn [::1]:35006] opened
+2025/05/30 16:27:32 INF [RTSP] [conn [::1]:35006] closed: invalid URL (/635)
+2025/05/30 16:27:32 INF [RTSP] [conn [::1]:35022] opened
+2025/05/30 16:27:32 INF [RTSP] [conn [::1]:35020] opened
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35020] closed: invalid URL (/635)
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35022] closed: invalid URL (/635)
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35036] opened
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35036] closed: invalid URL (/635)
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35038] opened
+2025/05/30 16:27:33 INF [RTSP] [conn [::1]:35048] opened
+2025/05/30 16:27:38 INF [RTSP] [conn [::1]:35038] closed: invalid URL (/635)
+2025/05/30 16:27:38 INF [RTSP] [conn [::1]:35048] closed: invalid URL (/635)
+2025/05/30 16:27:38 INF [RTSP] [conn [::1]:51318] opened
+2025/05/30 16:27:38 INF [RTSP] [conn [::1]:51318] closed: invalid URL (/635)
+2025/05/30 16:27:46 INF [WebRTC] [session f8a65341] created by [::1]:42684
+2025/05/30 16:27:46 INF [WebRTC] [session f8a65341] closed: no one is publishing to path '635'
+2025/05/30 16:27:48 INF [WebRTC] [session f78422ed] created by [::1]:42684
+2025/05/30 16:27:48 INF [WebRTC] [session f78422ed] closed: no one is publishing to path '635'
+2025/05/30 16:27:50 INF [WebRTC] [session 74ab265b] created by [::1]:42684
+2025/05/30 16:27:50 INF [WebRTC] [session 74ab265b] closed: no one is publishing to path '635'
+2025/05/30 16:27:52 INF [WebRTC] [session d15742eb] created by [::1]:42684
+2025/05/30 16:27:52 INF [WebRTC] [session d15742eb] closed: no one is publishing to path '635'
+2025/05/30 16:27:54 INF [WebRTC] [session 59a921ed] created by [::1]:42684
+2025/05/30 16:27:54 INF [WebRTC] [session 59a921ed] closed: no one is publishing to path '635'
+2025/05/30 16:27:55 INF [WebRTC] [session 23e5c594] created by [::1]:42684
+2025/05/30 16:27:55 INF [WebRTC] [session 23e5c594] closed: no one is publishing to path '635'
+2025/05/30 16:27:58 INF [WebRTC] [session 402fa5a4] created by [::1]:42684
+2025/05/30 16:27:58 INF [WebRTC] [session 402fa5a4] closed: no one is publishing to path '635'
+2025/05/30 16:28:00 INF [WebRTC] [session 1e86b2e8] created by [::1]:42684
+2025/05/30 16:28:00 INF [WebRTC] [session 1e86b2e8] closed: no one is publishing to path '635'
+2025/05/30 16:28:02 INF [WebRTC] [session 6ed5e233] created by [::1]:42684
+2025/05/30 16:28:02 INF [WebRTC] [session 6ed5e233] closed: no one is publishing to path '635'
+2025/05/30 16:28:04 INF [WebRTC] [session f4f49fcf] created by [::1]:42684
+2025/05/30 16:28:04 INF [WebRTC] [session f4f49fcf] closed: no one is publishing to path '635'
+2025/05/30 16:28:06 INF [WebRTC] [session b9b9220e] created by [::1]:42684
+2025/05/30 16:28:06 INF [WebRTC] [session b9b9220e] closed: no one is publishing to path '635'
+2025/05/30 16:28:08 INF [WebRTC] [session 85846aaf] created by [::1]:42684
+2025/05/30 16:28:08 INF [WebRTC] [session 85846aaf] closed: no one is publishing to path '635'
+2025/05/30 16:28:10 INF [WebRTC] [session b7dab780] created by [::1]:42684
+2025/05/30 16:28:10 INF [WebRTC] [session b7dab780] closed: no one is publishing to path '635'
+2025/05/30 16:28:12 INF [WebRTC] [session fd27e8a2] created by [::1]:42684
+2025/05/30 16:28:12 INF [WebRTC] [session fd27e8a2] closed: no one is publishing to path '635'
+2025/05/30 16:28:14 INF [WebRTC] [session 207b1155] created by [::1]:42684
+2025/05/30 16:28:14 INF [WebRTC] [session 207b1155] closed: no one is publishing to path '635'
+2025/05/30 16:28:16 INF [WebRTC] [session e25e3083] created by [::1]:42684
+2025/05/30 16:28:16 INF [WebRTC] [session e25e3083] closed: no one is publishing to path '635'
+2025/05/30 16:28:18 INF [WebRTC] [session b46c5dc4] created by [::1]:42684
+2025/05/30 16:28:18 INF [WebRTC] [session b46c5dc4] closed: no one is publishing to path '635'
+2025/05/30 16:28:20 INF [WebRTC] [session ca2d2c04] created by [::1]:42684
+2025/05/30 16:28:20 INF [WebRTC] [session ca2d2c04] closed: no one is publishing to path '635'
+2025/05/30 16:28:22 INF [WebRTC] [session 4e3cb18a] created by [::1]:42684
+2025/05/30 16:28:22 INF [WebRTC] [session 4e3cb18a] closed: no one is publishing to path '635'
+2025/05/30 16:28:24 INF [WebRTC] [session d9575f9e] created by [::1]:42684
+2025/05/30 16:28:24 INF [WebRTC] [session d9575f9e] closed: no one is publishing to path '635'
+2025/05/30 16:28:26 INF [WebRTC] [session ddb88cfa] created by [::1]:42684
+2025/05/30 16:28:26 INF [WebRTC] [session ddb88cfa] closed: no one is publishing to path '635'
+2025/05/30 16:28:28 INF [WebRTC] [session 895fe7a0] created by [::1]:42684
+2025/05/30 16:28:28 INF [WebRTC] [session 895fe7a0] closed: no one is publishing to path '635'
+2025/05/30 16:28:30 INF [WebRTC] [session a8ded374] created by [::1]:42684
+2025/05/30 16:28:30 INF [WebRTC] [session a8ded374] closed: no one is publishing to path '635'
+2025/05/30 16:28:32 INF [WebRTC] [session 82da8255] created by [::1]:42684
+2025/05/30 16:28:32 INF [WebRTC] [session 82da8255] closed: no one is publishing to path '635'
+2025/05/30 16:28:34 INF [WebRTC] [session 5efc1d31] created by [::1]:42684
+2025/05/30 16:28:34 INF [WebRTC] [session 5efc1d31] closed: no one is publishing to path '635'
+2025/05/30 16:28:36 INF [WebRTC] [session f9368882] created by [::1]:42684
+2025/05/30 16:28:36 INF [WebRTC] [session f9368882] closed: no one is publishing to path '635'
+2025/05/30 16:28:38 INF [WebRTC] [session 0e6f1e8e] created by [::1]:42684
+2025/05/30 16:28:38 INF [WebRTC] [session 0e6f1e8e] closed: no one is publishing to path '635'
+2025/05/30 16:28:41 INF [WebRTC] [session 5cae1dfb] created by [::1]:42684
+2025/05/30 16:28:41 INF [WebRTC] [session 5cae1dfb] closed: no one is publishing to path '635'
+2025/05/30 16:28:43 INF [WebRTC] [session be835962] created by [::1]:42684
+2025/05/30 16:28:43 INF [WebRTC] [session be835962] closed: no one is publishing to path '635'
+2025/05/30 16:28:45 INF [WebRTC] [session bc358e33] created by [::1]:42684
+2025/05/30 16:28:45 INF [WebRTC] [session bc358e33] closed: no one is publishing to path '635'
+2025/05/30 16:28:47 INF [WebRTC] [session 74071687] created by [::1]:42684
+2025/05/30 16:28:47 INF [WebRTC] [session 74071687] closed: no one is publishing to path '635'
+2025/05/30 16:28:47 INF [RTSP] [conn [::1]:46572] opened
+2025/05/30 16:28:47 INF [RTSP] [session fb26d747] created by [::1]:46572
+2025/05/30 16:28:47 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 16:28:47 INF [RTSP] [session fb26d747] is publishing to path '635', 2 tracks (H264, Opus)
+2025/05/30 16:28:49 INF [WebRTC] [session 71e67112] created by [::1]:42684
+2025/05/30 16:28:50 INF [WebRTC] [session 71e67112] peer connection established, local candidate: host/udp/192.168.31.104/8189, remote candidate: prflx/udp/192.168.31.104/33053
+2025/05/30 16:28:50 INF [WebRTC] [session 71e67112] is reading from path '635', 2 tracks (H264, Opus)
+2025/05/30 16:29:20 INF [path 635] onsesgmentcomplete called0
+2025/05/30 16:29:20 INF [path 635] onsesgmentcomplete called01
+2025/05/30 16:29:20 INF [path 635] onsesgmentcomplete called02
+2025/05/30 16:29:20 INF [path 635] onsesgmentcomplete called03
+2025/05/30 16:29:20 INF [path 635] DB starting
+2025/05/30 18:10:55 INF MediaMTX 
+2025/05/30 18:10:56 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 18:10:56 INF [RTSP] listener opened on :8554 (TCP), :8000 (UDP/RTP), :8001 (UDP/RTCP)
+2025/05/30 18:10:56 INF [RTMP] listener opened on :1935
+2025/05/30 18:10:56 INF [HLS] listener opened on :8888
+2025/05/30 18:10:56 INF [WebRTC] listener opened on :8889 (HTTP), :8189 (ICE/UDP)
+2025/05/30 18:10:56 INF [SRT] listener opened on :8890 (UDP)
+2025/05/30 18:11:35 INF [RTSP] [conn [::1]:41976] opened
+2025/05/30 18:11:35 INF [RTSP] [session da6def26] created by [::1]:41976
+2025/05/30 18:11:35 INF [path 635] [recorder] recording 2 tracks (H264, Opus)
+2025/05/30 18:11:35 INF [RTSP] [session da6def26] is publishing to path '635', 2 tracks (H264, Opus)
+2025/05/30 18:11:58 INF [path 635] onsesgmentcomplete called0
+2025/05/30 18:11:58 INF [path 635] onsesgmentcomplete called01
+2025/05/30 18:11:58 INF [path 635] onsesgmentcomplete called02
+2025/05/30 18:11:58 INF [path 635] onsesgmentcomplete called03
+2025/05/30 18:11:58 INF [path 635] DB starting
+2025/05/30 18:23:43 INF MediaMTX 
+2025/05/30 18:23:44 ERR Error connecting to SQLite database: unable to open database file: no such file or directory
+2025/05/30 18:23:44 ERR unable to open database file: no such file or directory
+2025/05/30 18:27:30 INF MediaMTX 
+2025/05/30 18:27:31 INF Successfully connected to SQLite database
+2025/05/30 18:27:31 INF configuration loaded from /home/vicharak/Downloads/edge/mediamtx-forked/mediamtx.yml
+2025/05/30 18:27:31 INF [RTSP] listener opened on :8554 (TCP), :8000 (UDP/RTP), :8001 (UDP/RTCP)
+2025/05/30 18:27:31 INF [RTMP] listener opened on :1935
+2025/05/30 18:27:31 INF [HLS] listener opened on :8888
+2025/05/30 18:27:31 INF [WebRTC] listener opened on :8889 (HTTP), :8189 (ICE/UDP)
+2025/05/30 18:27:31 INF [SRT] listener opened on :8890 (UDP)
+2025/05/30 18:29:24 INF [RTSP] [conn [::1]:52716] opened
+2025/05/30 18:29:24 INF [RTSP] [session 330f4019] created by [::1]:52716
+2025/05/30 18:29:24 INF [path 636] [recorder] recording 1 track (H264)
+2025/05/30 18:29:24 INF [RTSP] [session 330f4019] is publishing to path '636', 1 track (H264)
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:29:55 INF [path 636] DB starting
+2025/05/30 18:29:55 INF [path 636] is_record: 0
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:29:55 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:30:25 INF [path 636] DB starting
+2025/05/30 18:30:25 INF [path 636] is_record: 0
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:30:25 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:30:55 INF [path 636] DB starting
+2025/05/30 18:30:55 INF [path 636] is_record: 0
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:30:55 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:31:26 INF [path 636] DB starting
+2025/05/30 18:31:26 INF [path 636] is_record: 0
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:31:26 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:31:56 INF [path 636] DB starting
+2025/05/30 18:31:56 INF [path 636] is_record: 0
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:31:56 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:32:27 INF [path 636] DB starting
+2025/05/30 18:32:27 INF [path 636] is_record: 0
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:32:27 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:32:57 INF [path 636] DB starting
+2025/05/30 18:32:57 INF [path 636] is_record: 0
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:32:57 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called0
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called01
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called02
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called03
+2025/05/30 18:33:27 INF [path 636] DB starting
+2025/05/30 18:33:27 INF [path 636] is_record: 1
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called4
+2025/05/30 18:33:27 INF [path 636] onsesgmentcomplete called5
+2025/05/30 18:33:27 INF [path 636] Recording check success
+2025/05/30 18:33:27 INF [path 636] runOnRecordSegmentComplete command launched
+2025/05/30 18:33:27 INF [path 636] Before ping clippath: /mnt/HD_Data/636/2025-05-30_18-32-57-407247.mp4 
+2025/05/30 18:33:27 INF [path 636] Before ping camId: 636 
+2025/05/30 18:33:28 INF [path 636] 1 recording metadata added 

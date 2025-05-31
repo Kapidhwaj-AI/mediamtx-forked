@@ -349,6 +349,14 @@ func (p *Core) createResources(initial bool) error {
 			p.Log(logger.Info, "Connected to MySQL database")
 		}
 
+		msgSQLite, errSQLite := ConnectWithSqlite() // Use config.ConnectWithSqlite
+		if errSQLite != nil {
+			p.Log(logger.Error, "Error connecting to SQLite database: %v", errSQLite)
+			return errSQLite // This should be a critical error, as recording depends on it
+		} else if msgSQLite == "success" {
+			p.Log(logger.Info, "Successfully connected to SQLite database")
+		}
+
 		if p.confPath != "" {
 			a, _ := filepath.Abs(p.confPath)
 			p.Log(logger.Info, "configuration loaded from %s", a)

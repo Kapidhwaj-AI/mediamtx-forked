@@ -11,7 +11,6 @@ import (
 
 	"github.com/bluenviron/gortsplib/v4/pkg/base"
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
-
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/externalcmd"
@@ -795,11 +794,11 @@ func (pa *path) checkRecording() (int, error) {
 	// pa.Log(logger.Info, "Before ping")
 	pa.Log(logger.Info, "DB starting")
 	// pa.Log(DB)
-	err := DB.Ping()
+	err := SQLiteDB.Ping()
 	// pa.Log(logger.Info, "Ping error: %v", err)
 	if err != nil {
 		pa.Log(logger.Info, "DB connection failed")
-		msg, err := ConnectWithSql()
+		msg, err := ConnectWithSqlite()
 		if msg == "success" {
 			pa.Log(logger.Info, "DB connection success")
 		} else {
@@ -815,7 +814,7 @@ func (pa *path) checkRecording() (int, error) {
 	camId := pa.name
 	//obj := strings.Split(name, "_")
 	//camid := obj[3]
-	results, err := DB.Query("SELECT isRecord FROM  cameras WHERE id = ?", camId)
+	results, err := SQLiteDB.Query("SELECT is_record FROM  camera_info WHERE id = ?", camId)
 	if err != nil {
 		pa.Log(logger.Info, "DB query failed error:")
 		return 0, err
@@ -825,7 +824,7 @@ func (pa *path) checkRecording() (int, error) {
 	for results.Next() {
 		var isRecord int
 		err = results.Scan(&isRecord)
-		pa.Log(logger.Info, "isRecord: %v", isRecord)
+		pa.Log(logger.Info, "is_record: %v", isRecord)
 		if err != nil {
 			pa.Log(logger.Info, "DB query failed error:")
 			continue

@@ -777,26 +777,26 @@ func (pa *path) setNotReady() {
 }
 
 func (pa *path) checkRecording() (int, error) {
-	// pa.Log(logger.Info, "inside check recording")
-	// if pa.DB == nil {
-	// 	pa.Log(logger.Info, "DB is null")
-	// 	msg, err := pa.ConnectWithSql()
-	// 	if msg == "success" {
-	// 		pa.Log(logger.Info, "DB connection success")
-	// 	} else {
-	// 		pa.Log(logger.Info, "DB connection failed")
-	// 		return 0, err
-	// 	}
-	// 	if err != nil {
-	// 		pa.Log(logger.Info, "DB connection failed")
-	// 		return 0, err
-	// 	}
-	// }
-	// pa.Log(logger.Info, "Before ping")
+	 pa.Log(logger.Info, "inside check recording")
+//	 if pa.DB == nil {
+//	 	pa.Log(logger.Info, "DB is null")
+//	 	msg, err := pa.ConnectWithSql()
+//	 	if msg == "success" {
+//	 		pa.Log(logger.Info, "DB connection success")
+//	 	} else {
+//	 		pa.Log(logger.Info, "DB connection failed")
+//	 		return 0, err
+//	 	}
+//	 	if err != nil {
+//	 		pa.Log(logger.Info, "DB connection failed")
+//	 		return 0, err
+//	 	}
+//	 }
+	pa.Log(logger.Info, "Before ping")
 	pa.Log(logger.Info, "DB starting")
-        // pa.Log(DB)
+       // pa.Log(DB)
 	err := DB.Ping()
-	// pa.Log(logger.Info, "Ping error: %v", err)
+	pa.Log(logger.Info, "Ping error: %v", err)
 	if err != nil {
 		pa.Log(logger.Info, "DB connection failed")
 		msg, err := ConnectWithSql()
@@ -815,7 +815,7 @@ func (pa *path) checkRecording() (int, error) {
 	camId := pa.name
 	//obj := strings.Split(name, "_")
 	//camid := obj[3]
-	results, err := DB.Query("SELECT isRecord FROM  cameras WHERE id = ?", camId)
+	results, err := DB.Query("SELECT is_record FROM  cameras WHERE camera_id = ?", camId)
 	if err != nil {
 		pa.Log(logger.Info, "DB query failed error:")
 		return 0, err

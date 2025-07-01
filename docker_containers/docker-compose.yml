@@ -1,0 +1,29 @@
+services:
+  mediamtx0:
+    image: mediamtx0
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_WEBRTCADDITIONALHOSTS: 34.56.93.42
+    ports:
+       - "8554:8554"
+       - "8889:8889"
+       - "9189:8189/udp"
+    restart: always
+    volumes:  
+      - /home/queries/certs:/app/certs
+      - /home/queries/logs:/app/logs
+
+  mediamtx_naveen:
+    image: mediamtx_naveen
+    environment:
+      MTX_PROTOCOLS: tcp
+      MTX_WEBRTCADDITIONALHOSTS: 34.56.93.42
+    ports:
+       - "1937:1937"
+       - "9554:8554"
+       - "9889:8889"
+       - "8189:8189/udp"
+    restart: always
+    volumes:  
+      - /home/queries/certs:/app/certs
+      - /home/queries/logs:/app/logs

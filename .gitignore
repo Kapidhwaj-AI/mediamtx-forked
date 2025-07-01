@@ -7,3 +7,4 @@
 /internal/staticsources/rpicamera/mtxrpicam_*
 docker_containers
 rclone.conf
+/internal/core/config.go

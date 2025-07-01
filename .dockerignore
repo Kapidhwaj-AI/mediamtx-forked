@@ -6,5 +6,5 @@
 /internal/core/VERSION
 /internal/servers/hls/hls.min.js
 /internal/staticsources/rpicamera/mtxrpicam_*
-/docker_containers/
-/rclone.conf/
+docker_containers
+rclone.conf

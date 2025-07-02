@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"fmt"
+	"os/exec"
+    "path/filepath"
 	"net"
 	"strconv"
 	"strings"
@@ -777,124 +779,179 @@ func (pa *path) setNotReady() {
 }
 
 func (pa *path) checkRecording() (int, error) {
-	 pa.Log(logger.Info, "inside check recording")
-//	 if pa.DB == nil {
-//	 	pa.Log(logger.Info, "DB is null")
-//	 	msg, err := pa.ConnectWithSql()
-//	 	if msg == "success" {
-//	 		pa.Log(logger.Info, "DB connection success")
-//	 	} else {
-//	 		pa.Log(logger.Info, "DB connection failed")
-//	 		return 0, err
-//	 	}
-//	 	if err != nil {
-//	 		pa.Log(logger.Info, "DB connection failed")
-//	 		return 0, err
-//	 	}
-//	 }
-	pa.Log(logger.Info, "Before ping")
-	pa.Log(logger.Info, "DB starting")
+         pa.Log(logger.Info, "inside check recording")
+//       if pa.DB == nil {
+//              pa.Log(logger.Info, "DB is null")
+//              msg, err := pa.ConnectWithSql()
+//              if msg == "success" {
+//                      pa.Log(logger.Info, "DB connection success")
+//              } else {
+//                      pa.Log(logger.Info, "DB connection failed")
+//                      return 0, err
+//              }
+//              if err != nil {
+//                      pa.Log(logger.Info, "DB connection failed")
+//                      return 0, err
+//              }
+//       }
+        pa.Log(logger.Info, "Before ping")
+        pa.Log(logger.Info, "DB starting")
        // pa.Log(DB)
-	err := DB.Ping()
-	pa.Log(logger.Info, "Ping error: %v", err)
-	if err != nil {
-		pa.Log(logger.Info, "DB connection failed")
-		msg, err := ConnectWithSql()
-		if msg == "success" {
-			pa.Log(logger.Info, "DB connection success")
-		} else {
-			pa.Log(logger.Info, "DB connection failed")
-			return 0, err
-		}
-		if err != nil {
-			pa.Log(logger.Info, "DB connection failed")
-			return 0, err
-		}
-	}
+        err := DB.Ping()
+        pa.Log(logger.Info, "Ping error: %v", err)
+        if err != nil {
+                pa.Log(logger.Info, "DB connection failed")
+                msg, err := ConnectWithSql()
+                if msg == "success" {
+                        pa.Log(logger.Info, "DB connection success")
+                } else {
+                        pa.Log(logger.Info, "DB connection failed")
+                        return 0, err
+                }
+                if err != nil {
+                        pa.Log(logger.Info, "DB connection failed")
+                        return 0, err
+                }
+        }
 
-	camId := pa.name
-	//obj := strings.Split(name, "_")
-	//camid := obj[3]
-	results, err := DB.Query("SELECT is_record FROM  cameras WHERE camera_id = ?", camId)
-	if err != nil {
-		pa.Log(logger.Info, "DB query failed error:")
-		return 0, err
-	}
-	defer results.Close()
+        camId := pa.name
+        //obj := strings.Split(name, "_")
+        //camid := obj[3]
+        results, err := DB.Query("SELECT is_record FROM  cameras WHERE camera_id = ?", camId)
+        if err != nil {
+                pa.Log(logger.Info, "DB query failed error:")
+                return 0, err
+        }
+        defer results.Close()
 
-	for results.Next() {
-		var isRecord int
-		err = results.Scan(&isRecord)
-		pa.Log(logger.Info, "isRecord: %v", isRecord)
-		if err != nil {
-			pa.Log(logger.Info, "DB query failed error:")
-			continue
-		}
-		return isRecord, nil
-		//creditMap[accountNumber] = append(creditMap[accountNumber][:index], creditMap[accountNumber][index+1:]...)
+        for results.Next() {
+                var isRecord int
+                err = results.Scan(&isRecord)
+                pa.Log(logger.Info, "isRecord: %v", isRecord)
+                if err != nil {
+                        pa.Log(logger.Info, "DB query failed error:")
+                        continue
+                }
+                return isRecord, nil
+                //creditMap[accountNumber] = append(creditMap[accountNumber][:index], creditMap[accountNumber][index+1:]...)
 
-		//return "", nil
-	}
-	return 0, nil
+                //return "", nil
+        }
+        return 0, nil
+}
+
+func (pa *path) insertRecordingMetadata(segmentPath string) {
+        pa.Log(logger.Info, "Starting upload and metadata insert for segment: %s", segmentPath)
+
+        cameraid := pa.name
+        filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
+
+        // Build GCS path
+        gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%s", cameraid, filename)
+
+        // ✅ Upload the file to GCS using rclone copyto
+        cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+                pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))
+                return
+        }
+        pa.Log(logger.Info, "rclone upload successful. Output: %s", string(output))
+
+        // ✅ Only after successful upload, insert into DB
+        nameParts := strings.Split(filename, "_")
+        if len(nameParts) < 2 {
+                pa.Log(logger.Info, "Invalid file name format")
+                return
+        }
+
+        datePart := nameParts[0]
+        timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
+        ymd := strings.Split(datePart, "-")
+        hmsu := strings.Split(timePart, "-")
+        year, _ := strconv.Atoi(ymd[0])
+        month, _ := strconv.Atoi(ymd[1])
+        day, _ := strconv.Atoi(ymd[2])
+        hour, _ := strconv.Atoi(hmsu[0])
+        minute, _ := strconv.Atoi(hmsu[1])
+        second, _ := strconv.Atoi(hmsu[2])
+        microseconds, _ := strconv.Atoi(hmsu[3])
+
+        t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
+        unixTimestamp := t.Unix()
+
+        // Build public GCS URL
+        recordedPath := fmt.Sprintf("https://storage.googleapis.com/kapibucket2/%s/%s", cameraid, filename)
+
+        _, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
+                cameraid, unixTimestamp, recordedPath)
+        if err != nil {
+                pa.Log(logger.Info, "Insert into recorded_clips failed: %v", err)
+        } else {
+                pa.Log(logger.Info, "Recording metadata inserted successfully for: %s", recordedPath)
+        }
 }
 
 func (pa *path) startRecording() {
-	pa.recorder = &recorder.Recorder{
-		PathFormat:      pa.conf.RecordPath,
-		Format:          pa.conf.RecordFormat,
-		PartDuration:    time.Duration(pa.conf.RecordPartDuration),
-		SegmentDuration: time.Duration(pa.conf.RecordSegmentDuration),
-		PathName:        pa.name,
-		Stream:          pa.stream,
-		OnSegmentCreate: func(segmentPath string) {
-			if pa.conf.RunOnRecordSegmentCreate != "" {
-				env := pa.ExternalCmdEnv()
-				env["MTX_SEGMENT_PATH"] = segmentPath
+        pa.recorder = &recorder.Recorder{
+                PathFormat:      pa.conf.RecordPath,
+                Format:          pa.conf.RecordFormat,
+                PartDuration:    time.Duration(pa.conf.RecordPartDuration),
+                SegmentDuration: time.Duration(pa.conf.RecordSegmentDuration),
+                PathName:        pa.name,
+                Stream:          pa.stream,
+                OnSegmentCreate: func(segmentPath string) {
+                        if pa.conf.RunOnRecordSegmentCreate != "" {
+                                env := pa.ExternalCmdEnv()
+                                env["MTX_SEGMENT_PATH"] = segmentPath
 
-				pa.Log(logger.Info, "runOnRecordSegmentCreate command launched")
-				externalcmd.NewCmd(
-					pa.externalCmdPool,
-					pa.conf.RunOnRecordSegmentCreate,
-					false,
-					env,
-					nil)
-			}
-		},
-		OnSegmentComplete: func(segmentPath string, segmentDuration time.Duration) {
-			pa.Log(logger.Info, "onsesgmentcomplete called0")
-			if pa.conf.RunOnRecordSegmentComplete != "" {
-				pa.Log(logger.Info, "onsesgmentcomplete called01")
-				env := pa.ExternalCmdEnv()
-				pa.Log(logger.Info, "onsesgmentcomplete called02")
-				env["MTX_SEGMENT_PATH"] = segmentPath
-				env["MTX_SEGMENT_DURATION"] = strconv.FormatFloat(segmentDuration.Seconds(), 'f', -1, 64)
-				pa.Log(logger.Info, "onsesgmentcomplete called03")
+                                pa.Log(logger.Info, "runOnRecordSegmentCreate command launched")
+                                externalcmd.NewCmd(
+                                        pa.externalCmdPool,
+                                        pa.conf.RunOnRecordSegmentCreate,
+                                        false,
+                                        env,
+                                        nil)
+                        }
+                },
+                OnSegmentComplete: func(segmentPath string, segmentDuration time.Duration) {
+                        pa.Log(logger.Info, "onsesgmentcomplete called0")
+                        if pa.conf.RunOnRecordSegmentComplete != "" {
+                                pa.Log(logger.Info, "onsesgmentcomplete called01")
+                                env := pa.ExternalCmdEnv()
+                                pa.Log(logger.Info, "onsesgmentcomplete called02")
+                                env["MTX_SEGMENT_PATH"] = segmentPath
+                                env["MTX_SEGMENT_DURATION"] = strconv.FormatFloat(segmentDuration.Seconds(), 'f', -1, 64)
+                                pa.Log(logger.Info, "onsesgmentcomplete called03")
 
-				isRecord, err := pa.checkRecording()
-				pa.Log(logger.Info, "onsesgmentcomplete called4")
-				if err != nil {
-					pa.Log(logger.Info, "Recording check failed")
-				}
-				pa.Log(logger.Info, "onsesgmentcomplete called5")
-				if isRecord == 1 {
-					pa.Log(logger.Info, "Recording check success")
-					parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
-					modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
+                                isRecord, err := pa.checkRecording()
+                                pa.Log(logger.Info, "onsesgmentcomplete called4")
+                                if err != nil {
+                                        pa.Log(logger.Info, "Recording check failed")
+                                }
+                                pa.Log(logger.Info, "onsesgmentcomplete called5")
+                                if isRecord == 1 {
+                                        pa.Log(logger.Info, "Recording check success")
+                                        parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
+                                        modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
 
-					pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
-					externalcmd.NewCmd(
-						pa.externalCmdPool,
-						modifiedCommand,
-						false,
-						env,
-						nil)
-				}
-			}
-		},
-		Parent: pa,
-	}
-	pa.recorder.Initialize()
+                                        pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
+                                        externalcmd.NewCmd(
+                                                pa.externalCmdPool,
+                                                modifiedCommand,
+                                                false,
+                                                env,
+                                                nil)
+                                        pa.insertRecordingMetadata(segmentPath)
+
+                                }
+                        }
+                },
+                Parent: pa,
+        }
+        pa.recorder.Initialize()
 }
+
 
 func (pa *path) executeRemoveReader(r defs.Reader) {
 	delete(pa.readers, r)

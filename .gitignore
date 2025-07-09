@@ -4,7 +4,8 @@
 /apidocs/*.html
 /internal/core/VERSION
 /internal/servers/hls/hls.min.js
-/internal/staticsources/rpicamera/mtxrpicam_*
-docker_containers
-rclone.conf
 /internal/core/config.go
+/internal/staticsources/rpicamera/mtxrpicam_*
+/docker_containers
+/internal/core/config.go
+>>>>>>> 9a2842ee (feat : updated repo for git)

@@ -3,7 +3,9 @@ package core
 import (
 	"context"
 	"fmt"
-	"os/exec"
+	// "os/exec"
+	// "os"
+	// "io"
     	"path/filepath"
 	"net"
 	"strconv"
@@ -846,45 +848,37 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	cameraid := pa.name
 	filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
 
-	 nameParts := strings.Split(filename, "_")
-        if len(nameParts) < 2 {
-                pa.Log(logger.Info, "Invalid file name format")
-                return
-        }
-
-        datePart := nameParts[0]
-        timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
-        ymd := strings.Split(datePart, "-")
-        hmsu := strings.Split(timePart, "-")
-        year, _ := strconv.Atoi(ymd[0])
-        month, _ := strconv.Atoi(ymd[1])
-        day, _ := strconv.Atoi(ymd[2])
-        hour, _ := strconv.Atoi(hmsu[0])
-        minute, _ := strconv.Atoi(hmsu[1])
-        second, _ := strconv.Atoi(hmsu[2])
-        microseconds, _ := strconv.Atoi(hmsu[3])
-
-        t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
-        unixTimestamp := t.Unix()
-
-	// Build GCS path
-	gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
-
-	// ✅ Upload the file to GCS using rclone copyto
-	cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))
+	nameParts := strings.Split(filename, "_")
+	if len(nameParts) < 2 {
+		pa.Log(logger.Info, "Invalid file name format")
 		return
 	}
-	pa.Log(logger.Info, "rclone upload successful. Output: %s", string(output))
 
-	// ✅ Only after successful upload, insert into DB
+	datePart := nameParts[0]
+	timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
+	ymd := strings.Split(datePart, "-")
+	hmsu := strings.Split(timePart, "-")
+	year, _ := strconv.Atoi(ymd[0])
+	month, _ := strconv.Atoi(ymd[1])
+	day, _ := strconv.Atoi(ymd[2])
+	hour, _ := strconv.Atoi(hmsu[0])
+	minute, _ := strconv.Atoi(hmsu[1])
+	second, _ := strconv.Atoi(hmsu[2])
+	microseconds, _ := strconv.Atoi(hmsu[3])
 
-	// Build public GCS URL
-	recordedPath := fmt.Sprintf("https://storage.googleapis.com/kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
+	unixTimestamp := t.Unix()
 
-	_, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
+	var recordedPath string
+	// Check if recording is enabled for this camera
+		destDir := fmt.Sprintf("kapibucket2/%s/%04d-%02d-%02d", cameraid, year, month, day)
+
+
+		destPath := filepath.Join(destDir, filename)
+
+		recordedPath = destPath // use local path in DB
+
+	_, err := DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
 		cameraid, unixTimestamp, recordedPath)
 	if err != nil {
 		pa.Log(logger.Info, "Insert into recorded_clips failed: %v", err)
@@ -916,38 +910,69 @@ func (pa *path) startRecording() {
 			}
 		},
 		OnSegmentComplete: func(segmentPath string, segmentDuration time.Duration) {
-			pa.Log(logger.Info, "onsesgmentcomplete called0")
-			if pa.conf.RunOnRecordSegmentComplete != "" {
-				pa.Log(logger.Info, "onsesgmentcomplete called01")
-				env := pa.ExternalCmdEnv()
-				pa.Log(logger.Info, "onsesgmentcomplete called02")
-				env["MTX_SEGMENT_PATH"] = segmentPath
-				env["MTX_SEGMENT_DURATION"] = strconv.FormatFloat(segmentDuration.Seconds(), 'f', -1, 64)
-				pa.Log(logger.Info, "onsesgmentcomplete called03")
+    pa.Log(logger.Info, "OnSegmentComplete called")
 
-				isRecord, err := pa.checkRecording()
-				pa.Log(logger.Info, "onsesgmentcomplete called4")
-				if err != nil {
-					pa.Log(logger.Info, "Recording check failed")
-				}
-				pa.Log(logger.Info, "onsesgmentcomplete called5")
-				if isRecord == 1 {
-					pa.Log(logger.Info, "Recording check success")
-					parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
-					modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
+    if pa.conf.RunOnRecordSegmentComplete != "" {
+        env := pa.ExternalCmdEnv()
+        env["MTX_SEGMENT_PATH"] = segmentPath
+        env["MTX_SEGMENT_DURATION"] = strconv.FormatFloat(segmentDuration.Seconds(), 'f', -1, 64)
 
-					pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
-					externalcmd.NewCmd(
-						pa.externalCmdPool,
-						modifiedCommand,
-						false,
-						env,
-						nil)
-					pa.insertRecordingMetadata(segmentPath)
+        isRecord, err := pa.checkRecording()
+        if err != nil {
+            pa.Log(logger.Info, "Recording check failed: %v", err)
+            return
+        }
+        if isRecord == 1 {
+            pa.Log(logger.Info, "Recording check success")
 
-				}
-			}
-		},
+            parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
+            pa.Log(logger.Info, "RunOnRecordSegmentComplete parts: %v", parts)
+
+            // Extract year, month, day from filename
+            filename := filepath.Base(segmentPath) // e.g., "2025-07-01_13-45-12-123456.mp4"
+            nameParts := strings.Split(filename, "_")
+            if len(nameParts) < 2 {
+                pa.Log(logger.Info, "Invalid file name format for extracting date: %s", filename)
+                return
+            }
+
+            datePart := nameParts[0] // "2025-07-01"
+            ymd := strings.Split(datePart, "-")
+            if len(ymd) != 3 {
+                pa.Log(logger.Info, "Invalid date format in filename: %s", filename)
+                return
+            }
+
+            year, _ := strconv.Atoi(ymd[0])
+            month, _ := strconv.Atoi(ymd[1])
+            day, _ := strconv.Atoi(ymd[2])
+
+            modifiedCommand := fmt.Sprintf(
+                "%s ./recordings/%s%s/%s/%04d-%02d-%02d",
+                parts[0],
+                pa.name,
+                parts[1],
+                pa.name,
+                year,
+                month,
+                day,
+            )
+
+            pa.Log(logger.Info, "Final modifiedCommand: %s", modifiedCommand)
+
+            externalcmd.NewCmd(
+                pa.externalCmdPool,
+                modifiedCommand,
+                false,
+                env,
+                nil,
+            )
+
+            pa.insertRecordingMetadata(segmentPath)
+        }
+    }
+},
+
 		Parent: pa,
 	}
 	pa.recorder.Initialize()

@@ -841,25 +841,12 @@ func (pa *path) checkRecording() (int, error) {
 }
 
 func (pa *path) insertRecordingMetadata(segmentPath string) {
-        pa.Log(logger.Info, "Starting upload and metadata insert for segment: %s", segmentPath)
+	pa.Log(logger.Info, "Starting upload and metadata insert for segment: %s", segmentPath)
 
-        cameraid := pa.name
-        filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
+	cameraid := pa.name
+	filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
 
-        // Build GCS path
-        gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%s", cameraid, filename)
-
-        // ✅ Upload the file to GCS using rclone copyto
-        cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
-        output, err := cmd.CombinedOutput()
-        if err != nil {
-                pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))
-                return
-        }
-        pa.Log(logger.Info, "rclone upload successful. Output: %s", string(output))
-
-        // ✅ Only after successful upload, insert into DB
-        nameParts := strings.Split(filename, "_")
+	 nameParts := strings.Split(filename, "_")
         if len(nameParts) < 2 {
                 pa.Log(logger.Info, "Invalid file name format")
                 return
@@ -880,16 +867,30 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
         t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
         unixTimestamp := t.Unix()
 
-        // Build public GCS URL
-        recordedPath := fmt.Sprintf("kapibucket2/%s/%s", cameraid, filename)
+	// Build GCS path
+	gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 
-        _, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
-                cameraid, unixTimestamp, recordedPath)
-        if err != nil {
-                pa.Log(logger.Info, "Insert into recorded_clips failed: %v", err)
-        } else {
-                pa.Log(logger.Info, "Recording metadata inserted successfully for: %s", recordedPath)
-        }
+	// ✅ Upload the file to GCS using rclone copyto
+	cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))
+		return
+	}
+	pa.Log(logger.Info, "rclone upload successful. Output: %s", string(output))
+
+	// ✅ Only after successful upload, insert into DB
+
+	// Build public GCS URL
+	recordedPath := fmt.Sprintf("kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+
+	_, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
+		cameraid, unixTimestamp, recordedPath)
+	if err != nil {
+		pa.Log(logger.Info, "Insert into recorded_clips failed: %v", err)
+	} else {
+		pa.Log(logger.Info, "Recording metadata inserted successfully for: %s", recordedPath)
+	}
 }
 
 func (pa *path) startRecording() {
@@ -935,21 +936,21 @@ func (pa *path) startRecording() {
                                         parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
                                         modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
 
-                                        pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
-                                        externalcmd.NewCmd(
-                                                pa.externalCmdPool,
-                                                modifiedCommand,
-                                                false,
-                                                env,
-                                                nil)
-                                        pa.insertRecordingMetadata(segmentPath)
+					pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
+					externalcmd.NewCmd(
+						pa.externalCmdPool,
+						modifiedCommand,
+						false,
+						env,
+						nil)
+					pa.insertRecordingMetadata(segmentPath)
 
-                                }
-                        }
-                },
-                Parent: pa,
-        }
-        pa.recorder.Initialize()
+				}
+			}
+		},
+		Parent: pa,
+	}
+	pa.recorder.Initialize()
 }
 
 

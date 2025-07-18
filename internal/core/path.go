@@ -881,7 +881,7 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
         unixTimestamp := t.Unix()
 
         // Build public GCS URL
-        recordedPath := fmt.Sprintf("https://storage.googleapis.com/kapibucket2/%s/%s", cameraid, filename)
+        recordedPath := fmt.Sprintf("kapibucket2/%s/%s", cameraid, filename)
 
         _, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
                 cameraid, unixTimestamp, recordedPath)

@@ -288,7 +288,13 @@ const loadStream = () => {
 
 const supportsNonAdvertisedCodec = (codec, fmtp) => (
 	new Promise((resolve, reject) => {
-		const pc = new RTCPeerConnection({ iceServers: [] });
+		const pc = new RTCPeerConnection({ iceServers: [{
+			urls : "turn:34.56.93.42:3478",
+					username: "user123",
+					credential:"user123"
+		}],
+			iceTransportPolicy: "relay"
+		 });
 		pc.addTransceiver('audio', { direction: 'recvonly' });
 		pc.createOffer()
 			.then((offer) => {
@@ -502,7 +508,12 @@ const requestICEServers = () => {
 	})
 		.then((res) => {
 			pc = new RTCPeerConnection({
-				iceServers: linkToIceServers(res.headers.get('Link')),
+				iceServers: [{
+					urls : "turn:34.56.93.42:3478",
+					username: "user123",
+					credential:"user123"
+				}],
+				iceTransportPolicy: "relay",
 				// https://webrtc.org/getting-started/unified-plan-transition-guide
 				sdpSemantics: 'unified-plan',
 			});

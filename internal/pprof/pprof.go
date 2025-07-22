@@ -32,7 +32,7 @@ type PPROF struct {
 	ServerCert     string
 	AllowOrigin    string
 	TrustedProxies conf.IPNetworks
-	ReadTimeout    conf.StringDuration
+	ReadTimeout    conf.Duration
 	AuthManager    pprofAuthManager
 	Parent         pprofParent
 
@@ -97,13 +97,16 @@ func (pp *PPROF) middlewareOrigin(ctx *gin.Context) {
 }
 
 func (pp *PPROF) middlewareAuth(ctx *gin.Context) {
-	err := pp.AuthManager.Authenticate(&auth.Request{
-		IP:          net.ParseIP(ctx.ClientIP()),
+	req := &auth.Request{
 		Action:      conf.AuthActionPprof,
-		HTTPRequest: ctx.Request,
-	})
+		Query:       ctx.Request.URL.RawQuery,
+		Credentials: httpp.Credentials(ctx.Request),
+		IP:          net.ParseIP(ctx.ClientIP()),
+	}
+
+	err := pp.AuthManager.Authenticate(req)
 	if err != nil {
-		if err.(*auth.Error).AskCredentials { //nolint:errorlint
+		if err.(auth.Error).AskCredentials { //nolint:errorlint
 			ctx.Header("WWW-Authenticate", `Basic realm="mediamtx"`)
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return

@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
 	"time"
@@ -21,6 +22,10 @@ import (
 
 // ErrConnNotFound is returned when a connection is not found.
 var ErrConnNotFound = errors.New("connection not found")
+
+func interfaceIsEmpty(i interface{}) bool {
+	return reflect.ValueOf(i).Kind() != reflect.Ptr || reflect.ValueOf(i).IsNil()
+}
 
 func srtMaxPayloadSize(u int) int {
 	return ((u - 16) / 188) * 188 // 16 = SRT header, 188 = MPEG-TS packet
@@ -54,8 +59,13 @@ type serverAPIConnsKickReq struct {
 	res  chan serverAPIConnsKickRes
 }
 
+type serverMetrics interface {
+	SetSRTServer(defs.APISRTServer)
+}
+
 type serverPathManager interface {
-	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, error)
+	FindPathConf(req defs.PathFindPathConfReq) (*conf.Path, error)
+	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, *stream.Stream, error)
 	AddReader(req defs.PathAddReaderReq) (defs.Path, *stream.Stream, error)
 }
 
@@ -67,13 +77,14 @@ type serverParent interface {
 type Server struct {
 	Address             string
 	RTSPAddress         string
-	ReadTimeout         conf.StringDuration
-	WriteTimeout        conf.StringDuration
+	ReadTimeout         conf.Duration
+	WriteTimeout        conf.Duration
 	UDPMaxPayloadSize   int
 	RunOnConnect        string
 	RunOnConnectRestart bool
 	RunOnDisconnect     string
 	ExternalCmdPool     *externalcmd.Pool
+	Metrics             serverMetrics
 	PathManager         serverPathManager
 	Parent              serverParent
 
@@ -126,6 +137,10 @@ func (s *Server) Initialize() error {
 	s.wg.Add(1)
 	go s.run()
 
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetSRTServer(s)
+	}
+
 	return nil
 }
 
@@ -137,6 +152,11 @@ func (s *Server) Log(level logger.Level, format string, args ...interface{}) {
 // Close closes the server.
 func (s *Server) Close() {
 	s.Log(logger.Info, "listener is closing")
+
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetSRTServer(nil)
+	}
+
 	s.ctxCancel()
 	s.wg.Wait()
 }

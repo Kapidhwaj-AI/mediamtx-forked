@@ -12,9 +12,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/bluenviron/mediamtx/internal/api"
 	"github.com/bluenviron/mediamtx/internal/auth"
 	"github.com/bluenviron/mediamtx/internal/conf"
+	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/protocols/httpp"
 	"github.com/bluenviron/mediamtx/internal/restrictnetwork"
@@ -48,20 +48,20 @@ type Metrics struct {
 	ServerCert     string
 	AllowOrigin    string
 	TrustedProxies conf.IPNetworks
-	ReadTimeout    conf.StringDuration
+	ReadTimeout    conf.Duration
 	AuthManager    metricsAuthManager
 	Parent         metricsParent
 
 	httpServer   *httpp.Server
 	mutex        sync.Mutex
-	pathManager  api.PathManager
-	rtspServer   api.RTSPServer
-	rtspsServer  api.RTSPServer
-	rtmpServer   api.RTMPServer
-	rtmpsServer  api.RTMPServer
-	srtServer    api.SRTServer
-	hlsManager   api.HLSServer
-	webRTCServer api.WebRTCServer
+	pathManager  defs.APIPathManager
+	rtspServer   defs.APIRTSPServer
+	rtspsServer  defs.APIRTSPServer
+	rtmpServer   defs.APIRTMPServer
+	rtmpsServer  defs.APIRTMPServer
+	srtServer    defs.APISRTServer
+	hlsServer    defs.APIHLSServer
+	webRTCServer defs.APIWebRTCServer
 }
 
 // Initialize initializes metrics.
@@ -122,13 +122,16 @@ func (m *Metrics) middlewareOrigin(ctx *gin.Context) {
 }
 
 func (m *Metrics) middlewareAuth(ctx *gin.Context) {
-	err := m.AuthManager.Authenticate(&auth.Request{
-		IP:          net.ParseIP(ctx.ClientIP()),
+	req := &auth.Request{
 		Action:      conf.AuthActionMetrics,
-		HTTPRequest: ctx.Request,
-	})
+		Query:       ctx.Request.URL.RawQuery,
+		Credentials: httpp.Credentials(ctx.Request),
+		IP:          net.ParseIP(ctx.ClientIP()),
+	}
+
+	err := m.AuthManager.Authenticate(req)
 	if err != nil {
-		if err.(*auth.Error).AskCredentials { //nolint:errorlint
+		if err.(auth.Error).AskCredentials { //nolint:errorlint
 			ctx.Header("WWW-Authenticate", `Basic realm="mediamtx"`)
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
@@ -164,8 +167,8 @@ func (m *Metrics) onMetrics(ctx *gin.Context) {
 		out += metric("paths", "", 0)
 	}
 
-	if !interfaceIsEmpty(m.hlsManager) {
-		data, err := m.hlsManager.APIMuxersList()
+	if !interfaceIsEmpty(m.hlsServer) {
+		data, err := m.hlsServer.APIMuxersList()
 		if err == nil && len(data.Items) != 0 {
 			for _, i := range data.Items {
 				tags := "{name=\"" + i.Path + "\"}"
@@ -203,11 +206,27 @@ func (m *Metrics) onMetrics(ctx *gin.Context) {
 					out += metric("rtsp_sessions", tags, 1)
 					out += metric("rtsp_sessions_bytes_received", tags, int64(i.BytesReceived))
 					out += metric("rtsp_sessions_bytes_sent", tags, int64(i.BytesSent))
+					out += metric("rtsp_sessions_rtp_packets_received", tags, int64(i.RTPPacketsReceived))
+					out += metric("rtsp_sessions_rtp_packets_sent", tags, int64(i.RTPPacketsSent))
+					out += metric("rtsp_sessions_rtp_packets_lost", tags, int64(i.RTPPacketsLost))
+					out += metric("rtsp_sessions_rtp_packets_in_error", tags, int64(i.RTPPacketsInError))
+					out += metricFloat("rtsp_sessions_rtp_packets_jitter", tags, i.RTPPacketsJitter)
+					out += metric("rtsp_sessions_rtcp_packets_received", tags, int64(i.RTCPPacketsReceived))
+					out += metric("rtsp_sessions_rtcp_packets_sent", tags, int64(i.RTCPPacketsSent))
+					out += metric("rtsp_sessions_rtcp_packets_in_error", tags, int64(i.RTCPPacketsInError))
 				}
 			} else {
 				out += metric("rtsp_sessions", "", 0)
 				out += metric("rtsp_sessions_bytes_received", "", 0)
 				out += metric("rtsp_sessions_bytes_sent", "", 0)
+				out += metric("rtsp_sessions_rtp_packets_received", "", 0)
+				out += metric("rtsp_sessions_rtp_packets_sent", "", 0)
+				out += metric("rtsp_sessions_rtp_packets_lost", "", 0)
+				out += metric("rtsp_sessions_rtp_packets_in_error", "", 0)
+				out += metricFloat("rtsp_sessions_rtp_packets_jitter", "", 0)
+				out += metric("rtsp_sessions_rtcp_packets_received", "", 0)
+				out += metric("rtsp_sessions_rtcp_packets_sent", "", 0)
+				out += metric("rtsp_sessions_rtcp_packets_in_error", "", 0)
 			}
 		}()
 	}
@@ -237,11 +256,27 @@ func (m *Metrics) onMetrics(ctx *gin.Context) {
 					out += metric("rtsps_sessions", tags, 1)
 					out += metric("rtsps_sessions_bytes_received", tags, int64(i.BytesReceived))
 					out += metric("rtsps_sessions_bytes_sent", tags, int64(i.BytesSent))
+					out += metric("rtsps_sessions_rtp_packets_received", tags, int64(i.RTPPacketsReceived))
+					out += metric("rtsps_sessions_rtp_packets_sent", tags, int64(i.RTPPacketsSent))
+					out += metric("rtsps_sessions_rtp_packets_lost", tags, int64(i.RTPPacketsLost))
+					out += metric("rtsps_sessions_rtp_packets_in_error", tags, int64(i.RTPPacketsInError))
+					out += metricFloat("rtsps_sessions_rtp_packets_jitter", tags, i.RTPPacketsJitter)
+					out += metric("rtsps_sessions_rtcp_packets_received", tags, int64(i.RTCPPacketsReceived))
+					out += metric("rtsps_sessions_rtcp_packets_sent", tags, int64(i.RTCPPacketsSent))
+					out += metric("rtsps_sessions_rtcp_packets_in_error", tags, int64(i.RTCPPacketsInError))
 				}
 			} else {
 				out += metric("rtsps_sessions", "", 0)
 				out += metric("rtsps_sessions_bytes_received", "", 0)
 				out += metric("rtsps_sessions_bytes_sent", "", 0)
+				out += metric("rtsps_sessions_rtp_packets_received", "", 0)
+				out += metric("rtsps_sessions_rtp_packets_sent", "", 0)
+				out += metric("rtsps_sessions_rtp_packets_lost", "", 0)
+				out += metric("rtsps_sessions_rtp_packets_in_error", "", 0)
+				out += metricFloat("rtsps_sessions_rtp_packets_jitter", "", 0)
+				out += metric("rtsps_sessions_rtcp_packets_received", "", 0)
+				out += metric("rtsps_sessions_rtcp_packets_sent", "", 0)
+				out += metric("rtsps_sessions_rtcp_packets_in_error", "", 0)
 			}
 		}()
 	}
@@ -338,8 +373,57 @@ func (m *Metrics) onMetrics(ctx *gin.Context) {
 			}
 		} else {
 			out += metric("srt_conns", "", 0)
-			out += metric("srt_conns_bytes_received", "", 0)
+			out += metric("srt_conns_packets_sent", "", 0)
+			out += metric("srt_conns_packets_received", "", 0)
+			out += metric("srt_conns_packets_sent_unique", "", 0)
+			out += metric("srt_conns_packets_received_unique", "", 0)
+			out += metric("srt_conns_packets_send_loss", "", 0)
+			out += metric("srt_conns_packets_received_loss", "", 0)
+			out += metric("srt_conns_packets_retrans", "", 0)
+			out += metric("srt_conns_packets_received_retrans", "", 0)
+			out += metric("srt_conns_packets_sent_ack", "", 0)
+			out += metric("srt_conns_packets_received_ack", "", 0)
+			out += metric("srt_conns_packets_sent_nak", "", 0)
+			out += metric("srt_conns_packets_received_nak", "", 0)
+			out += metric("srt_conns_packets_sent_km", "", 0)
+			out += metric("srt_conns_packets_received_km", "", 0)
+			out += metric("srt_conns_us_snd_duration", "", 0)
+			out += metric("srt_conns_packets_send_drop", "", 0)
+			out += metric("srt_conns_packets_received_drop", "", 0)
+			out += metric("srt_conns_packets_received_undecrypt", "", 0)
 			out += metric("srt_conns_bytes_sent", "", 0)
+			out += metric("srt_conns_bytes_received", "", 0)
+			out += metric("srt_conns_bytes_sent_unique", "", 0)
+			out += metric("srt_conns_bytes_received_unique", "", 0)
+			out += metric("srt_conns_bytes_received_loss", "", 0)
+			out += metric("srt_conns_bytes_retrans", "", 0)
+			out += metric("srt_conns_bytes_received_retrans", "", 0)
+			out += metric("srt_conns_bytes_send_drop", "", 0)
+			out += metric("srt_conns_bytes_received_drop", "", 0)
+			out += metric("srt_conns_bytes_received_undecrypt", "", 0)
+			out += metricFloat("srt_conns_us_packets_send_period", "", 0)
+			out += metric("srt_conns_packets_flow_window", "", 0)
+			out += metric("srt_conns_packets_flight_size", "", 0)
+			out += metricFloat("srt_conns_ms_rtt", "", 0)
+			out += metricFloat("srt_conns_mbps_send_rate", "", 0)
+			out += metricFloat("srt_conns_mbps_receive_rate", "", 0)
+			out += metricFloat("srt_conns_mbps_link_capacity", "", 0)
+			out += metric("srt_conns_bytes_avail_send_buf", "", 0)
+			out += metric("srt_conns_bytes_avail_receive_buf", "", 0)
+			out += metricFloat("srt_conns_mbps_max_bw", "", 0)
+			out += metric("srt_conns_bytes_mss", "", 0)
+			out += metric("srt_conns_packets_send_buf", "", 0)
+			out += metric("srt_conns_bytes_send_buf", "", 0)
+			out += metric("srt_conns_ms_send_buf", "", 0)
+			out += metric("srt_conns_ms_send_tsb_pd_delay", "", 0)
+			out += metric("srt_conns_packets_receive_buf", "", 0)
+			out += metric("srt_conns_bytes_receive_buf", "", 0)
+			out += metric("srt_conns_ms_receive_buf", "", 0)
+			out += metric("srt_conns_ms_receive_tsb_pd_delay", "", 0)
+			out += metric("srt_conns_packets_reorder_tolerance", "", 0)
+			out += metric("srt_conns_packets_received_avg_belated_time", "", 0)
+			out += metricFloat("srt_conns_packets_send_loss_rate", "", 0)
+			out += metricFloat("srt_conns_packets_received_loss_rate", "", 0)
 		}
 	}
 
@@ -364,56 +448,56 @@ func (m *Metrics) onMetrics(ctx *gin.Context) {
 }
 
 // SetPathManager is called by core.
-func (m *Metrics) SetPathManager(s api.PathManager) {
+func (m *Metrics) SetPathManager(s defs.APIPathManager) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.pathManager = s
 }
 
 // SetHLSServer is called by core.
-func (m *Metrics) SetHLSServer(s api.HLSServer) {
+func (m *Metrics) SetHLSServer(s defs.APIHLSServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-	m.hlsManager = s
+	m.hlsServer = s
 }
 
 // SetRTSPServer is called by core.
-func (m *Metrics) SetRTSPServer(s api.RTSPServer) {
+func (m *Metrics) SetRTSPServer(s defs.APIRTSPServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.rtspServer = s
 }
 
 // SetRTSPSServer is called by core.
-func (m *Metrics) SetRTSPSServer(s api.RTSPServer) {
+func (m *Metrics) SetRTSPSServer(s defs.APIRTSPServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.rtspsServer = s
 }
 
 // SetRTMPServer is called by core.
-func (m *Metrics) SetRTMPServer(s api.RTMPServer) {
+func (m *Metrics) SetRTMPServer(s defs.APIRTMPServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.rtmpServer = s
 }
 
 // SetRTMPSServer is called by core.
-func (m *Metrics) SetRTMPSServer(s api.RTMPServer) {
+func (m *Metrics) SetRTMPSServer(s defs.APIRTMPServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.rtmpsServer = s
 }
 
 // SetSRTServer is called by core.
-func (m *Metrics) SetSRTServer(s api.SRTServer) {
+func (m *Metrics) SetSRTServer(s defs.APISRTServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.srtServer = s
 }
 
 // SetWebRTCServer is called by core.
-func (m *Metrics) SetWebRTCServer(s api.WebRTCServer) {
+func (m *Metrics) SetWebRTCServer(s defs.APIWebRTCServer) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	m.webRTCServer = s

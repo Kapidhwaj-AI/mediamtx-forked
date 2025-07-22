@@ -5,8 +5,9 @@ import (
 	"os"
 	"testing"
 
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
-	"github.com/bluenviron/mediacommon/pkg/formats/fmp4"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/formats/fmp4"
+	"github.com/bluenviron/mediacommon/v2/pkg/formats/mp4"
 	"github.com/bluenviron/mediamtx/internal/test"
 )
 
@@ -16,7 +17,7 @@ func writeBenchInit(f io.WriteSeeker) {
 			{
 				ID:        1,
 				TimeScale: 90000,
-				Codec: &fmp4.CodecH264{
+				Codec: &mp4.CodecH264{
 					SPS: test.FormatH264.SPS,
 					PPS: test.FormatH264.PPS,
 				},
@@ -24,8 +25,8 @@ func writeBenchInit(f io.WriteSeeker) {
 			{
 				ID:        2,
 				TimeScale: 90000,
-				Codec: &fmp4.CodecMPEG4Audio{
-					Config: mpeg4audio.Config{
+				Codec: &mp4.CodecMPEG4Audio{
+					Config: mpeg4audio.AudioSpecificConfig{
 						Type:         mpeg4audio.ObjectTypeAACLC,
 						SampleRate:   48000,
 						ChannelCount: 2,
@@ -48,7 +49,7 @@ func writeBenchInit(f io.WriteSeeker) {
 	}
 }
 
-func BenchmarkFMP4ReadInit(b *testing.B) {
+func BenchmarkFMP4ReadHeader(b *testing.B) {
 	f, err := os.CreateTemp(os.TempDir(), "mediamtx-playback-fmp4-")
 	if err != nil {
 		panic(err)
@@ -66,7 +67,7 @@ func BenchmarkFMP4ReadInit(b *testing.B) {
 			}
 			defer f.Close()
 
-			_, err = segmentFMP4ReadInit(f)
+			_, _, err = segmentFMP4ReadHeader(f)
 			if err != nil {
 				panic(err)
 			}

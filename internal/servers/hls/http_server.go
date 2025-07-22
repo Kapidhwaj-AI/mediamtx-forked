@@ -42,7 +42,7 @@ type httpServer struct {
 	serverCert     string
 	allowOrigin    string
 	trustedProxies conf.IPNetworks
-	readTimeout    conf.StringDuration
+	readTimeout    conf.Duration
 	pathManager    serverPathManager
 	parent         *Server
 
@@ -150,14 +150,15 @@ func (s *httpServer) onRequest(ctx *gin.Context) {
 	pathConf, err := s.pathManager.FindPathConf(defs.PathFindPathConfReq{
 		AccessRequest: defs.PathAccessRequest{
 			Name:        dir,
+			Query:       ctx.Request.URL.RawQuery,
 			Publish:     false,
-			IP:          net.ParseIP(ctx.ClientIP()),
 			Proto:       auth.ProtocolHLS,
-			HTTPRequest: ctx.Request,
+			Credentials: httpp.Credentials(ctx.Request),
+			IP:          net.ParseIP(ctx.ClientIP()),
 		},
 	})
 	if err != nil {
-		var terr *auth.Error
+		var terr auth.Error
 		if errors.As(err, &terr) {
 			if terr.AskCredentials {
 				ctx.Header("WWW-Authenticate", `Basic realm="mediamtx"`)

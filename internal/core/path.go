@@ -871,7 +871,7 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 
 	// ✅ Upload the file to GCS using rclone copyto
-	cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
+	cmd := exec.Command("rclone", "copyto","--gcs-bucket-policy-only", segmentPath, gcsPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))

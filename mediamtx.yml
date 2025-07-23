@@ -19,7 +19,7 @@ readTimeout: 50s
 writeTimeout: 50s
 # Size of the queue of outgoing packets.
 # A higher value allows to increase throughput, a lower value allows to save RAM.
-writeQueueSize: 2048
+writeQueueSize: 4096
 # Maximum size of outgoing UDP packets.
 # This can be decreased to avoid fragmentation on networks with a low UDP MTU.
 udpMaxPayloadSize: 1472
@@ -348,9 +348,9 @@ webrtcEncryption: yes
 # This can be generated with:
 # openssl genrsa -out server.key 2048
 # openssl req -new -x509 -sha256 -key server.key -out server.crt -days 3650
-webrtcServerKey: /home/queries/certs/server.key
+webrtcServerKey: /home/queries/kapidhwaj/certs/server.key
 # Path to the server certificate.
-webrtcServerCert: /home/queries/certs/server.crt
+webrtcServerCert: /home/queries/kapidhwaj/certs/server.crt
 # Value of the Access-Control-Allow-Origin header provided in every HTTP response.
 # This allows to play the WebRTC stream from an external website.
 webrtcAllowOrigin: '*'
@@ -372,12 +372,12 @@ webrtcIPsFromInterfaces: yes
 # An empty value means to use all available interfaces.
 webrtcIPsFromInterfacesList: []
 # List of additional hosts or IPs to send to clients.
-webrtcAdditionalHosts: [34.56.93.42]
+webrtcAdditionalHosts: [34.0.10.120]
 # ICE servers. Needed only when local listeners can't be reached by clients.
 # STUN servers allows to obtain and share the public IP of the server.
 # TURN/TURNS servers forces all traffic through them.
 webrtcICEServers2: []
-  # - url: stun:stun.l.google.com:19302
+  - url: stun:stun.l.google.com:19302
   # if user is "AUTH_SECRET", then authentication is secret based.
   # the secret must be inserted into the password field.
   # username: ''
@@ -459,7 +459,7 @@ pathDefaults:
   recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   # Format of recorded segments.
   # Available formats are "fmp4" (fragmented MP4) and "mpegts" (MPEG-TS).
-  recordFormat: mpegts
+  recordFormat: fMP4
   # fMP4 segments are concatenation of small MP4 files (parts), each with this duration.
   # MPEG-TS segments are concatenation of 188-bytes packets, flushed to disk with this period.
   # When a system failure occurs, the last part gets lost.

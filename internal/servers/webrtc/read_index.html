@@ -289,7 +289,7 @@ const loadStream = () => {
 const supportsNonAdvertisedCodec = (codec, fmtp) => (
 	new Promise((resolve, reject) => {
 		const pc = new RTCPeerConnection({ iceServers: [{
-			urls : "turn:34.56.93.42:3478",
+			urls : "turn:34.0.10.120:3478",
 					username: "user123",
 					credential:"user123"
 		}],
@@ -509,7 +509,7 @@ const requestICEServers = () => {
 		.then((res) => {
 			pc = new RTCPeerConnection({
 				iceServers: [{
-					urls : "turn:34.56.93.42:3478",
+					urls : "turn:34.0.10.120:3478",
 					username: "user123",
 					credential:"user123"
 				}],

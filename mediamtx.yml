@@ -472,7 +472,7 @@ pathDefaults:
   recordSegmentDuration: 30s
   # Delete segments after this timespan.
   # Set to 0s to disable automatic deletion.
-  recordDeleteAfter: 0s
+  recordDeleteAfter: 120s
 
   ###############################################
   # Default path settings -> Publisher source (when source is "publisher")

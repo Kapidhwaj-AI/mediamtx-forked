@@ -5,7 +5,8 @@
 ############################
 FROM --platform=$BUILDPLATFORM golang:1.22-alpine AS build
 ARG TARGETOS TARGETARCH
-ARG MAIN_PKG=./cmd/mediamtx
+# 👇 main package is the repo root by default
+ARG MAIN_PKG=./
 
 WORKDIR /src
 RUN apk add --no-cache git ca-certificates build-base
@@ -25,7 +26,7 @@ RUN if [ -d internal/staticsources/rpicamera ]; then \
       fi; \
     fi
 
-# Build only the main package
+# Build only the main package (root by default)
 ENV CGO_ENABLED=0
 RUN --mount=type=cache,target=/root/.cache/go-build \
     GOOS=$TARGETOS GOARCH=$TARGETARCH \

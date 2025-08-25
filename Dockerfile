@@ -51,11 +51,11 @@ ENV TZ=Asia/Kolkata \
 COPY --from=build /out /app
 
 # Optional: include a default config
-# COPY ./mediamtx.yml /app/mediamtx.yml
+COPY ./mediamtx.yml /app/mediamtx.yml
 
 RUN mkdir -p /var/lib/nvr/recordings && \
     chown -R app:app /app /var/lib/nvr
 USER app
 
 EXPOSE 8554 8889 9997
-ENTRYPOINT ["/app/mediamtx"]
+ENTRYPOINT ["/app/mediamtx", "/app/mediamtx.yml]

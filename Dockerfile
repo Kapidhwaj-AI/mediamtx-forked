@@ -58,4 +58,4 @@ RUN mkdir -p /var/lib/nvr/recordings && \
 USER app
 
 EXPOSE 8554 8889 9997
-ENTRYPOINT ["/app/mediamtx", "/app/mediamtx.yml]
+ENTRYPOINT ["/app/mediamtx","/app/mediamtx.yml"]

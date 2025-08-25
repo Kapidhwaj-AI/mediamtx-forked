@@ -48,7 +48,7 @@ ENV TZ=Asia/Kolkata \
     MYSQL_PASSWORD=vicharak2207 \
     MYSQL_DATABASE=kapidhwaj_local
 
-COPY --from=build /out/mediamtx /app/mediamtx
+COPY --from=build /out /app
 
 # Optional: include a default config
 # COPY ./mediamtx.yml /app/mediamtx.yml

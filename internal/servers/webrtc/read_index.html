@@ -288,13 +288,9 @@ const loadStream = () => {
 
 const supportsNonAdvertisedCodec = (codec, fmtp) => (
 	new Promise((resolve, reject) => {
-		const pc = new RTCPeerConnection({ iceServers: [{
-			urls : "turn:34.0.10.120:3478",
-					username: "user123",
-					credential:"user123"
-		}],
-			iceTransportPolicy: "relay"
-		 });
+		const pc = new RTCPeerConnection({ iceServers: [],
+		  sdpSemantics: 'unified-plan',
+});
 		pc.addTransceiver('audio', { direction: 'recvonly' });
 		pc.createOffer()
 			.then((offer) => {
@@ -502,35 +498,67 @@ const onTrack = (evt) => {
 	video.srcObject = evt.streams[0];
 };
 
+// Build RTC config for offline (host only) or online (TURN/STUN).
+function buildRtcConfig({mode, linkHeader}) {
+  // If server advertises ICE via Link: rel="ice-server" (WHEP), prefer that in online mode
+  const advertised = linkToIceServers(linkHeader);
+
+  if (mode === 'offline') {
+    return {
+      iceServers: [],                 // host candidates only (LAN/localhost)
+      // let WebRTC try both host TCP/UDP locally:
+      // iceTransportPolicy: 'all',
+      sdpSemantics: 'unified-plan',
+    };
+  }
+
+  // ONLINE: use WHEP-advertised ICE if present, else your TURN/STUN fallbacks
+  const fallback = [
+    // Optional STUN
+    { urls: ['stun:stun.l.google.com:19302'] },
+    // Your TURN (prefer TLS :443)
+    {
+      urls: [
+        'turn:34.0.10.120:3478',
+        'turn:media.kapidhwaj.ai:3478?transport=tcp'
+      ],
+      username: 'user123',
+      credential: 'user123',
+    }
+  ];
+
+  // If you want relay-only on the open internet, uncomment next line:
+  // const policy = 'relay'; else leave undefined to allow p2p when possible
+  return {
+    iceServers: (advertised && advertised.length) ? advertised : fallback,
+    // iceTransportPolicy: policy,
+    sdpSemantics: 'unified-plan',
+  };
+}
+
 const requestICEServers = () => {
-	fetch(new URL('whep', window.location.href) + window.location.search, {
-		method: 'OPTIONS',
-	})
-		.then((res) => {
-			pc = new RTCPeerConnection({
-				iceServers: [{
-					urls : "turn:34.0.10.120:3478",
-					username: "user123",
-					credential:"user123"
-				}],
-				iceTransportPolicy: "relay",
-				// https://webrtc.org/getting-started/unified-plan-transition-guide
-				sdpSemantics: 'unified-plan',
-			});
+  // decide mode from query (?net=offline|online). Default to offline for kiosk.
+  const params = new URLSearchParams(window.location.search);
+  const mode = (params.get('net') || 'offline').toLowerCase();
 
-			const direction = 'sendrecv';
-			pc.addTransceiver('video', { direction });
-			pc.addTransceiver('audio', { direction });
+  fetch(new URL('whep', window.location.href) + window.location.search, { method: 'OPTIONS' })
+    .then((res) => {
+      const linkHeader = res.headers.get('link'); // WHEP may advertise ICE servers here
+      const rtcConfig = buildRtcConfig({ mode, linkHeader });
 
-			pc.onicecandidate = (evt) => onLocalCandidate(evt);
-			pc.oniceconnectionstatechange = () => onConnectionState();
-			pc.ontrack = (evt) => onTrack(evt);
+      pc = new RTCPeerConnection(rtcConfig);
 
-			createOffer();
-		})
-		.catch((err) => {
-			onError(err.toString());
-		});
+      const direction = 'sendrecv';
+      pc.addTransceiver('video', { direction });
+      pc.addTransceiver('audio', { direction });
+
+      pc.onicecandidate = onLocalCandidate;
+      pc.oniceconnectionstatechange = onConnectionState;
+      pc.ontrack = onTrack;
+
+      createOffer();
+    })
+    .catch((err) => onError(err.toString()));
 };
 
  const parseBoolString = (str, defaultVal) => {

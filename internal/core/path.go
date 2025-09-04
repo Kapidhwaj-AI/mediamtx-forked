@@ -870,7 +870,7 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	unixTimestamp := t.Unix()
 
 	// Build GCS path
-	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 
 	// ✅ Upload the file to GCS using rclone copyto
 	cmd := exec.Command("rclone", "copyto", segmentPath, gcsPath)
@@ -884,7 +884,7 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	// ✅ Only after successful upload, insert into DB
 
 	// Build public GCS URL
-	recordedPath := fmt.Sprintf("kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	recordedPath := fmt.Sprintf("kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 	
 	_, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
 		cameraid, unixTimestamp, recordedPath)

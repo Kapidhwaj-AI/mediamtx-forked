@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpmpeg4video"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4video"
+	"github.com/bluenviron/gortsplib/v4/pkg/format/rtpfragmented"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4video"
 	"github.com/pion/rtp"
 
+	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/unit"
 )
 
@@ -26,48 +27,42 @@ var (
 	}
 )
 
-type formatProcessorMPEG4Video struct {
-	udpMaxPayloadSize int
-	format            *format.MPEG4Video
-	encoder           *rtpmpeg4video.Encoder
-	decoder           *rtpmpeg4video.Decoder
-	randomStart       uint32
+type mpeg4Video struct {
+	RTPMaxPayloadSize  int
+	Format             *format.MPEG4Video
+	GenerateRTPPackets bool
+	Parent             logger.Writer
+
+	encoder     *rtpfragmented.Encoder
+	decoder     *rtpfragmented.Decoder
+	randomStart uint32
 }
 
-func newMPEG4Video(
-	udpMaxPayloadSize int,
-	forma *format.MPEG4Video,
-	generateRTPPackets bool,
-) (*formatProcessorMPEG4Video, error) {
-	t := &formatProcessorMPEG4Video{
-		udpMaxPayloadSize: udpMaxPayloadSize,
-		format:            forma,
-	}
-
-	if generateRTPPackets {
+func (t *mpeg4Video) initialize() error {
+	if t.GenerateRTPPackets {
 		err := t.createEncoder()
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		t.randomStart, err = randUint32()
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return t, nil
+	return nil
 }
 
-func (t *formatProcessorMPEG4Video) createEncoder() error {
-	t.encoder = &rtpmpeg4video.Encoder{
-		PayloadMaxSize: t.udpMaxPayloadSize - 12,
-		PayloadType:    t.format.PayloadTyp,
+func (t *mpeg4Video) createEncoder() error {
+	t.encoder = &rtpfragmented.Encoder{
+		PayloadMaxSize: t.RTPMaxPayloadSize,
+		PayloadType:    t.Format.PayloadTyp,
 	}
 	return t.encoder.Init()
 }
 
-func (t *formatProcessorMPEG4Video) updateTrackParameters(frame []byte) {
+func (t *mpeg4Video) updateTrackParameters(frame []byte) {
 	if bytes.HasPrefix(frame, []byte{0, 0, 1, byte(mpeg4video.VisualObjectSequenceStartCode)}) {
 		end := bytes.Index(frame[4:], []byte{0, 0, 1, byte(mpeg4video.GroupOfVOPStartCode)})
 		if end < 0 {
@@ -75,13 +70,14 @@ func (t *formatProcessorMPEG4Video) updateTrackParameters(frame []byte) {
 		}
 		conf := frame[:end+4]
 
-		if !bytes.Equal(conf, t.format.Config) {
-			t.format.SafeSetParams(conf)
+		if !bytes.Equal(conf, t.Format.Config) {
+			t.Format.SafeSetParams(conf)
 		}
 	}
 }
 
-func (t *formatProcessorMPEG4Video) remuxFrame(frame []byte) []byte {
+func (t *mpeg4Video) remuxFrame(frame []byte) []byte {
+	// remove config
 	if bytes.HasPrefix(frame, []byte{0, 0, 1, byte(mpeg4video.VisualObjectSequenceStartCode)}) {
 		end := bytes.Index(frame[4:], []byte{0, 0, 1, byte(mpeg4video.GroupOfVOPStartCode)})
 		if end >= 0 {
@@ -89,9 +85,10 @@ func (t *formatProcessorMPEG4Video) remuxFrame(frame []byte) []byte {
 		}
 	}
 
+	// add config
 	if bytes.Contains(frame, []byte{0, 0, 1, byte(mpeg4video.GroupOfVOPStartCode)}) {
-		f := make([]byte, len(t.format.Config)+len(frame))
-		n := copy(f, t.format.Config)
+		f := make([]byte, len(t.Format.Config)+len(frame))
+		n := copy(f, t.Format.Config)
 		copy(f[n:], frame)
 		frame = f
 	}
@@ -99,7 +96,7 @@ func (t *formatProcessorMPEG4Video) remuxFrame(frame []byte) []byte {
 	return frame
 }
 
-func (t *formatProcessorMPEG4Video) ProcessUnit(uu unit.Unit) error { //nolint:dupl
+func (t *mpeg4Video) ProcessUnit(uu unit.Unit) error { //nolint:dupl
 	u := uu.(*unit.MPEG4Video)
 
 	t.updateTrackParameters(u.Frame)
@@ -110,18 +107,17 @@ func (t *formatProcessorMPEG4Video) ProcessUnit(uu unit.Unit) error { //nolint:d
 		if err != nil {
 			return err
 		}
+		u.RTPPackets = pkts
 
 		for _, pkt := range u.RTPPackets {
 			pkt.Timestamp += t.randomStart + uint32(u.PTS)
 		}
-
-		u.RTPPackets = pkts
 	}
 
 	return nil
 }
 
-func (t *formatProcessorMPEG4Video) ProcessRTPPacket( //nolint:dupl
+func (t *mpeg4Video) ProcessRTPPacket( //nolint:dupl
 	pkt *rtp.Packet,
 	ntp time.Time,
 	pts int64,
@@ -138,19 +134,19 @@ func (t *formatProcessorMPEG4Video) ProcessRTPPacket( //nolint:dupl
 	t.updateTrackParameters(pkt.Payload)
 
 	// remove padding
-	pkt.Header.Padding = false
+	pkt.Padding = false
 	pkt.PaddingSize = 0
 
-	if pkt.MarshalSize() > t.udpMaxPayloadSize {
-		return nil, fmt.Errorf("payload size (%d) is greater than maximum allowed (%d)",
-			pkt.MarshalSize(), t.udpMaxPayloadSize)
+	if len(pkt.Payload) > t.RTPMaxPayloadSize {
+		return nil, fmt.Errorf("RTP payload size (%d) is greater than maximum allowed (%d)",
+			len(pkt.Payload), t.RTPMaxPayloadSize)
 	}
 
 	// decode from RTP
 	if hasNonRTSPReaders || t.decoder != nil {
 		if t.decoder == nil {
 			var err error
-			t.decoder, err = t.format.CreateDecoder()
+			t.decoder, err = t.Format.CreateDecoder()
 			if err != nil {
 				return nil, err
 			}
@@ -158,7 +154,7 @@ func (t *formatProcessorMPEG4Video) ProcessRTPPacket( //nolint:dupl
 
 		frame, err := t.decoder.Decode(pkt)
 		if err != nil {
-			if errors.Is(err, rtpmpeg4video.ErrMorePacketsNeeded) {
+			if errors.Is(err, rtpfragmented.ErrMorePacketsNeeded) {
 				return u, nil
 			}
 			return nil, err

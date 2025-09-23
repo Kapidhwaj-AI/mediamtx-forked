@@ -4,9 +4,9 @@ import (
 	"time"
 
 	"github.com/bluenviron/gortsplib/v4/pkg/format"
-	"github.com/bluenviron/mediacommon/pkg/codecs/h264"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg1audio"
-	"github.com/bluenviron/mediacommon/pkg/codecs/mpeg4audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/h264"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg1audio"
+	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/amf0"
 	"github.com/bluenviron/mediamtx/internal/protocols/rtmp/h264conf"
@@ -43,27 +43,25 @@ func mpeg1AudioChannels(m mpeg1audio.ChannelMode) bool {
 	return m != mpeg1audio.ChannelModeMono
 }
 
-// Writer is a wrapper around Conn that provides utilities to mux outgoing data.
+// Writer provides functions to write outgoing data.
 type Writer struct {
-	conn *Conn
+	Conn       Conn
+	VideoTrack format.Format
+	AudioTrack format.Format
 }
 
-// NewWriter allocates a Writer.
-func NewWriter(conn *Conn, videoTrack format.Format, audioTrack format.Format) (*Writer, error) {
-	w := &Writer{
-		conn: conn,
-	}
-
-	err := w.writeTracks(videoTrack, audioTrack)
+// Initialize initializes Writer.
+func (w *Writer) Initialize() error {
+	err := w.writeTracks()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return w, nil
+	return nil
 }
 
-func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format) error {
-	err := w.conn.Write(&message.DataAMF0{
+func (w *Writer) writeTracks() error {
+	err := w.Conn.Write(&message.DataAMF0{
 		ChunkStreamID:   4,
 		MessageStreamID: 0x1000000,
 		Payload: []interface{}{
@@ -77,7 +75,7 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 				{
 					Key: "videocodecid",
 					Value: func() float64 {
-						switch videoTrack.(type) {
+						switch w.VideoTrack.(type) {
 						case *format.H264:
 							return message.CodecH264
 
@@ -93,11 +91,11 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 				{
 					Key: "audiocodecid",
 					Value: func() float64 {
-						switch audioTrack.(type) {
+						switch w.AudioTrack.(type) {
 						case *format.MPEG1Audio:
 							return message.CodecMPEG1Audio
 
-						case *format.MPEG4Audio:
+						case *format.MPEG4Audio, *format.MPEG4AudioLATM:
 							return message.CodecMPEG4Audio
 
 						default:
@@ -112,7 +110,7 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 		return err
 	}
 
-	if videoTrack, ok := videoTrack.(*format.H264); ok {
+	if videoTrack, ok := w.VideoTrack.(*format.H264); ok {
 		// write decoder config only if SPS and PPS are available.
 		// if they're not available yet, they're sent later.
 		if sps, pps := videoTrack.SafeParams(); sps != nil && pps != nil {
@@ -121,7 +119,7 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 				PPS: pps,
 			}.Marshal()
 
-			err = w.conn.Write(&message.Video{
+			err = w.Conn.Write(&message.Video{
 				ChunkStreamID:   message.VideoChunkStreamID,
 				MessageStreamID: 0x1000000,
 				Codec:           message.CodecH264,
@@ -135,19 +133,21 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 		}
 	}
 
-	var audioConfig *mpeg4audio.AudioSpecificConfig
+	var audioConf *mpeg4audio.AudioSpecificConfig
 
-	if track, ok := audioTrack.(*format.MPEG4Audio); ok {
-		audioConfig = track.GetConfig()
+	if track, ok := w.AudioTrack.(*format.MPEG4Audio); ok {
+		audioConf = track.Config
+	} else if track, ok := w.AudioTrack.(*format.MPEG4AudioLATM); ok {
+		audioConf = track.StreamMuxConfig.Programs[0].Layers[0].AudioSpecificConfig
 	}
 
-	if audioConfig != nil {
-		enc, err := audioConfig.Marshal()
+	if audioConf != nil {
+		enc, err := audioConf.Marshal()
 		if err != nil {
 			return err
 		}
 
-		err = w.conn.Write(&message.Audio{
+		err = w.Conn.Write(&message.Audio{
 			ChunkStreamID:   message.AudioChunkStreamID,
 			MessageStreamID: 0x1000000,
 			Codec:           message.CodecMPEG4Audio,
@@ -166,17 +166,17 @@ func (w *Writer) writeTracks(videoTrack format.Format, audioTrack format.Format)
 }
 
 // WriteH264 writes H264 data.
-func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, idrPresent bool, au [][]byte) error {
-	avcc, err := h264.AVCCMarshal(au)
+func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, au [][]byte) error {
+	avcc, err := h264.AVCC(au).Marshal()
 	if err != nil {
 		return err
 	}
 
-	return w.conn.Write(&message.Video{
+	return w.Conn.Write(&message.Video{
 		ChunkStreamID:   message.VideoChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecH264,
-		IsKeyFrame:      idrPresent,
+		IsKeyFrame:      h264.IsRandomAccess(au),
 		Type:            message.VideoTypeAU,
 		Payload:         avcc,
 		DTS:             dts,
@@ -186,7 +186,7 @@ func (w *Writer) WriteH264(pts time.Duration, dts time.Duration, idrPresent bool
 
 // WriteMPEG4Audio writes MPEG-4 Audio data.
 func (w *Writer) WriteMPEG4Audio(pts time.Duration, au []byte) error {
-	return w.conn.Write(&message.Audio{
+	return w.Conn.Write(&message.Audio{
 		ChunkStreamID:   message.AudioChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecMPEG4Audio,
@@ -201,7 +201,7 @@ func (w *Writer) WriteMPEG4Audio(pts time.Duration, au []byte) error {
 
 // WriteMPEG1Audio writes MPEG-1 Audio data.
 func (w *Writer) WriteMPEG1Audio(pts time.Duration, h *mpeg1audio.FrameHeader, frame []byte) error {
-	return w.conn.Write(&message.Audio{
+	return w.Conn.Write(&message.Audio{
 		ChunkStreamID:   message.AudioChunkStreamID,
 		MessageStreamID: 0x1000000,
 		Codec:           message.CodecMPEG1Audio,

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/bluenviron/mediacommon/pkg/formats/fmp4"
+	"github.com/bluenviron/mediacommon/v2/pkg/formats/fmp4"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/recordstore"
@@ -57,21 +57,21 @@ func seekAndMux(
 		}
 		defer f.Close()
 
-		firstInit, err = segmentFMP4ReadInit(f)
+		firstInit, _, err = segmentFMP4ReadHeader(f)
 		if err != nil {
 			return err
 		}
 
 		m.writeInit(firstInit)
 
-		segmentStartOffset := start.Sub(segments[0].Start)
+		segmentStartOffset := segments[0].Start.Sub(start) // this is negative
 
-		segmentMaxElapsed, err := segmentFMP4SeekAndMuxParts(f, segmentStartOffset, duration, firstInit, m)
+		segmentDuration, err := segmentFMP4MuxParts(f, segmentStartOffset, duration, firstInit.Tracks, m)
 		if err != nil {
 			return err
 		}
 
-		segmentEnd = start.Add(segmentMaxElapsed)
+		segmentEnd = start.Add(segmentDuration)
 
 		for _, seg := range segments[1:] {
 			f, err = os.Open(seg.Fpath)
@@ -81,7 +81,7 @@ func seekAndMux(
 			defer f.Close()
 
 			var init *fmp4.Init
-			init, err = segmentFMP4ReadInit(f)
+			init, _, err = segmentFMP4ReadHeader(f)
 			if err != nil {
 				return err
 			}
@@ -90,15 +90,15 @@ func seekAndMux(
 				break
 			}
 
-			segmentStartOffset := seg.Start.Sub(start)
+			segmentStartOffset := seg.Start.Sub(start) // this is positive
 
-			var segmentMaxElapsed time.Duration
-			segmentMaxElapsed, err = segmentFMP4MuxParts(f, segmentStartOffset, duration, firstInit, m)
+			var segmentDuration time.Duration
+			segmentDuration, err = segmentFMP4MuxParts(f, segmentStartOffset, duration, firstInit.Tracks, m)
 			if err != nil {
 				return err
 			}
 
-			segmentEnd = start.Add(segmentMaxElapsed)
+			segmentEnd = start.Add(segmentDuration)
 		}
 
 		err = m.flush()
@@ -153,7 +153,8 @@ func (s *Server) onGet(ctx *gin.Context) {
 		return
 	}
 
-	segments, err := recordstore.FindSegmentsInTimespan(pathConf, pathName, start, duration)
+	end := start.Add(duration)
+	segments, err := recordstore.FindSegments(pathConf, pathName, &start, &end)
 	if err != nil {
 		if errors.Is(err, recordstore.ErrNoSegmentsFound) {
 			s.writeError(ctx, http.StatusNotFound, err)

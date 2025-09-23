@@ -16,81 +16,112 @@ import (
 )
 
 func TestSource(t *testing.T) {
-	for _, ca := range []string{
+	for _, encryption := range []string{
 		"plain",
 		"tls",
 	} {
-		t.Run(ca, func(t *testing.T) {
-			ln, err := func() (net.Listener, error) {
-				if ca == "plain" {
-					return net.Listen("tcp", "127.0.0.1:1935")
+		for _, auth := range []string{
+			"no auth",
+			"auth",
+		} {
+			t.Run(encryption+"_"+auth, func(t *testing.T) {
+				var ln net.Listener
+
+				if encryption == "plain" {
+					var err error
+					ln, err = net.Listen("tcp", "127.0.0.1:1935")
+					require.NoError(t, err)
+				} else {
+					serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
+					require.NoError(t, err)
+					defer os.Remove(serverCertFpath)
+
+					serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
+					require.NoError(t, err)
+					defer os.Remove(serverKeyFpath)
+
+					var cert tls.Certificate
+					cert, err = tls.LoadX509KeyPair(serverCertFpath, serverKeyFpath)
+					require.NoError(t, err)
+
+					ln, err = tls.Listen("tcp", "127.0.0.1:1936", &tls.Config{Certificates: []tls.Certificate{cert}})
+					require.NoError(t, err)
 				}
 
-				serverCertFpath, err := test.CreateTempFile(test.TLSCertPub)
-				require.NoError(t, err)
-				defer os.Remove(serverCertFpath)
+				defer ln.Close()
 
-				serverKeyFpath, err := test.CreateTempFile(test.TLSCertKey)
-				require.NoError(t, err)
-				defer os.Remove(serverKeyFpath)
+				go func() {
+					for {
+						nconn, err := ln.Accept()
+						require.NoError(t, err)
+						defer nconn.Close()
 
-				var cert tls.Certificate
-				cert, err = tls.LoadX509KeyPair(serverCertFpath, serverKeyFpath)
-				require.NoError(t, err)
+						conn := &rtmp.ServerConn{
+							RW: nconn,
+						}
+						err = conn.Initialize()
+						require.NoError(t, err)
 
-				return tls.Listen("tcp", "127.0.0.1:1936", &tls.Config{Certificates: []tls.Certificate{cert}})
-			}()
-			require.NoError(t, err)
-			defer ln.Close()
+						if auth == "auth" {
+							err = conn.CheckCredentials("myuser", "mypass")
+							if err != nil {
+								continue
+							}
+						}
 
-			go func() {
-				nconn, err := ln.Accept()
-				require.NoError(t, err)
-				defer nconn.Close()
+						err = conn.Accept()
+						require.NoError(t, err)
 
-				conn, _, _, err := rtmp.NewServerConn(nconn)
-				require.NoError(t, err)
+						w := &rtmp.Writer{
+							Conn:       conn,
+							VideoTrack: test.FormatH264,
+							AudioTrack: test.FormatMPEG4Audio,
+						}
+						err = w.Initialize()
+						require.NoError(t, err)
 
-				w, err := rtmp.NewWriter(conn, test.FormatH264, test.FormatMPEG4Audio)
-				require.NoError(t, err)
+						err = w.WriteH264(2*time.Second, 2*time.Second, [][]byte{{5, 2, 3, 4}})
+						require.NoError(t, err)
 
-				err = w.WriteH264(0, 0, true, [][]byte{{0x05, 0x02, 0x03, 0x04}})
-				require.NoError(t, err)
-			}()
+						err = w.WriteH264(3*time.Second, 3*time.Second, [][]byte{{5, 2, 3, 4}})
+						require.NoError(t, err)
 
-			var te *test.SourceTester
+						break
+					}
+				}()
 
-			if ca == "plain" {
-				te = test.NewSourceTester(
+				var source string
+
+				if encryption == "plain" {
+					source = "rtmp://"
+				} else {
+					source = "rtmps://"
+				}
+
+				if auth == "auth" {
+					source += "myuser:mypass@"
+				}
+
+				source += "localhost/teststream"
+
+				te := test.NewSourceTester(
 					func(p defs.StaticSourceParent) defs.StaticSource {
 						return &Source{
-							ReadTimeout:  conf.StringDuration(10 * time.Second),
-							WriteTimeout: conf.StringDuration(10 * time.Second),
+							ReadTimeout:  conf.Duration(10 * time.Second),
+							WriteTimeout: conf.Duration(10 * time.Second),
 							Parent:       p,
 						}
 					},
-					"rtmp://localhost/teststream",
-					&conf.Path{},
-				)
-			} else {
-				te = test.NewSourceTester(
-					func(p defs.StaticSourceParent) defs.StaticSource {
-						return &Source{
-							ReadTimeout:  conf.StringDuration(10 * time.Second),
-							WriteTimeout: conf.StringDuration(10 * time.Second),
-							Parent:       p,
-						}
-					},
-					"rtmps://localhost/teststream",
+					source,
 					&conf.Path{
 						SourceFingerprint: "33949E05FFFB5FF3E8AA16F8213A6251B4D9363804BA53233C4DA9A46D6F2739",
 					},
 				)
-			}
 
-			defer te.Close()
+				defer te.Close()
 
-			<-te.Unit
-		})
+				<-te.Unit
+			})
+		}
 	}
 }

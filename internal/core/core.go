@@ -110,10 +110,11 @@ type Core struct {
 var p *Core
 
 type MyRequest struct {
-	Time conf.StringDuration `json:"time"`
+	Time time.Duration `json:"time"`
 }
 
-func ChangeRecordingDuration(time_ conf.StringDuration) {
+
+func ChangeRecordingDuration(time_ time.Duration) {
 	p.pathManager.changeRecordingDuration(time_)
 }
 

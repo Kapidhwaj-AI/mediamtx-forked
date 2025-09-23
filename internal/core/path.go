@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
+	"strings"
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
@@ -917,7 +917,6 @@ func (pa *path) startRecording() {
 					// 	nil)
 					pa.insertRecordingMetadata(segmentPath)
 
-					pa.insertRecordingMetadata(segmentPath)
 
 				}
 			}

@@ -131,10 +131,13 @@ func (pm *pathManager) initialize() {
 	}
 }
 
-func (pm *pathManager) changeRecordingDuration(time_ conf.StringDuration) {
+func (pm *pathManager) changeRecordingDuration(time_ time.Duration) {	
 	for _, pa := range pm.paths {
+
 		//pa.recordAgent.PartDuration = time.Duration(time_)
-		pa.recorder.SegmentDuration = time.Duration(time_)
+		if pa.path != nil && pa.path.recorder != nil {
+			pa.path.recorder.SegmentDuration = time_ // assuming SegmentDuration is time.Duration
+		}
 	}
 }
 

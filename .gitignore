@@ -8,3 +8,6 @@
 /internal/staticsources/rpicamera/mtxrpicam_*/
 /docker_containers
 /internal/core/config.go
+recordings
+mediamtx
+

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
-    "path/filepath"
+  "path/filepath"
 	"net"
 	"strconv"
 	"sync"
@@ -814,32 +814,32 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	cameraid := pa.name
 	filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
 
-	 nameParts := strings.Split(filename, "_")
-        if len(nameParts) < 2 {
-                pa.Log(logger.Info, "Invalid file name format")
-                return
-        }
+	nameParts := strings.Split(filename, "_")
+	if len(nameParts) < 2 {
+		pa.Log(logger.Info, "Invalid file name format")
+		return
+	}
 
-        datePart := nameParts[0]
-        timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
-        ymd := strings.Split(datePart, "-")
-        hmsu := strings.Split(timePart, "-")
-        year, _ := strconv.Atoi(ymd[0])
-        month, _ := strconv.Atoi(ymd[1])
-        day, _ := strconv.Atoi(ymd[2])
-        hour, _ := strconv.Atoi(hmsu[0])
-        minute, _ := strconv.Atoi(hmsu[1])
-        second, _ := strconv.Atoi(hmsu[2])
-        microseconds, _ := strconv.Atoi(hmsu[3])
+	datePart := nameParts[0]
+	timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
+	ymd := strings.Split(datePart, "-")
+	hmsu := strings.Split(timePart, "-")
+	year, _ := strconv.Atoi(ymd[0])
+	month, _ := strconv.Atoi(ymd[1])
+	day, _ := strconv.Atoi(ymd[2])
+	hour, _ := strconv.Atoi(hmsu[0])
+	minute, _ := strconv.Atoi(hmsu[1])
+	second, _ := strconv.Atoi(hmsu[2])
+	microseconds, _ := strconv.Atoi(hmsu[3])
 
-        t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
-        unixTimestamp := t.Unix()
+	t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
+	unixTimestamp := t.Unix()
 
 	// Build GCS path
-	gcsPath := fmt.Sprintf("remote:kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 
 	// ✅ Upload the file to GCS using rclone copyto
-	cmd := exec.Command("rclone", "copyto", "--gcs-bucket-policy-only", segmentPath, gcsPath)
+	cmd := exec.Command("rclone", "copyto", segmentPath, gcsPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		pa.Log(logger.Info, "rclone upload failed: %v. Output: %s", err, string(output))
@@ -850,8 +850,9 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	// ✅ Only after successful upload, insert into DB
 
 	// Build public GCS URL
-	recordedPath := fmt.Sprintf("kapibucket2/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
 
+	recordedPath := fmt.Sprintf("kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	
 	_, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
 		cameraid, unixTimestamp, recordedPath)
 	if err != nil {
@@ -862,18 +863,18 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 }
 
 func (pa *path) startRecording() {
-	pa.recorder = &recorder.Recorder{
-		PathFormat:      pa.conf.RecordPath,
-		Format:          pa.conf.RecordFormat,
-		PartDuration:    time.Duration(pa.conf.RecordPartDuration),
-		MaxPartSize:     pa.conf.RecordMaxPartSize,
-		SegmentDuration: time.Duration(pa.conf.RecordSegmentDuration),
-		PathName:        pa.name,
-		Stream:          pa.stream,
-		OnSegmentCreate: func(segmentPath string) {
-			if pa.conf.RunOnRecordSegmentCreate != "" {
-				env := pa.ExternalCmdEnv()
-				env["MTX_SEGMENT_PATH"] = segmentPath
+
+        pa.recorder = &recorder.Recorder{
+                PathFormat:      pa.conf.RecordPath,
+                Format:          pa.conf.RecordFormat,
+                PartDuration:    time.Duration(pa.conf.RecordPartDuration),
+                SegmentDuration: time.Duration(pa.conf.RecordSegmentDuration),
+                PathName:        pa.name,
+                Stream:          pa.stream,
+                OnSegmentCreate: func(segmentPath string) {
+                        if pa.conf.RunOnRecordSegmentCreate != "" {
+                                env := pa.ExternalCmdEnv()
+                                env["MTX_SEGMENT_PATH"] = segmentPath
 
                                 pa.Log(logger.Info, "runOnRecordSegmentCreate command launched")
                                 externalcmd.NewCmd(
@@ -901,17 +902,19 @@ func (pa *path) startRecording() {
                                 }
                                 pa.Log(logger.Info, "onsesgmentcomplete called5")
                                 if isRecord == 1 {
-                                        pa.Log(logger.Info, "Recording check success")
-                                        parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
-                                        modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
+
+                                        // pa.Log(logger.Info, "Recording check success")
+                                        // parts := strings.Split(pa.conf.RunOnRecordSegmentComplete, " ./recordings")
+                                        // modifiedCommand := parts[0] + " ./recordings/" + pa.name + parts[1] + "/" + pa.name
+
 
 					pa.Log(logger.Info, "runOnRecordSegmentComplete command launched")
-					externalcmd.NewCmd(
-						pa.externalCmdPool,
-						modifiedCommand,
-						false,
-						env,
-						nil)
+					// externalcmd.NewCmd(
+					// 	pa.externalCmdPool,
+					// 	modifiedCommand,
+					// 	false,
+					// 	env,
+					// 	nil)
 					pa.insertRecordingMetadata(segmentPath)
 
 					pa.insertRecordingMetadata(segmentPath)

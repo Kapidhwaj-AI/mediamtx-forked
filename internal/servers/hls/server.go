@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
 
@@ -16,6 +17,10 @@ import (
 
 // ErrMuxerNotFound is returned when a muxer is not found.
 var ErrMuxerNotFound = errors.New("muxer not found")
+
+func interfaceIsEmpty(i interface{}) bool {
+	return reflect.ValueOf(i).Kind() != reflect.Ptr || reflect.ValueOf(i).IsNil()
+}
 
 type serverGetMuxerRes struct {
 	muxer *muxer
@@ -49,7 +54,12 @@ type serverAPIMuxersGetReq struct {
 	res  chan serverAPIMuxersGetRes
 }
 
+type serverMetrics interface {
+	SetHLSServer(defs.APIHLSServer)
+}
+
 type serverPathManager interface {
+	SetHLSServer(*Server) []defs.Path
 	FindPathConf(req defs.PathFindPathConfReq) (*conf.Path, error)
 	AddReader(req defs.PathAddReaderReq) (defs.Path, *stream.Stream, error)
 }
@@ -69,12 +79,13 @@ type Server struct {
 	AlwaysRemux     bool
 	Variant         conf.HLSVariant
 	SegmentCount    int
-	SegmentDuration conf.StringDuration
-	PartDuration    conf.StringDuration
+	SegmentDuration conf.Duration
+	PartDuration    conf.Duration
 	SegmentMaxSize  conf.StringSize
 	Directory       string
-	ReadTimeout     conf.StringDuration
-	MuxerCloseAfter conf.StringDuration
+	ReadTimeout     conf.Duration
+	MuxerCloseAfter conf.Duration
+	Metrics         serverMetrics
 	PathManager     serverPathManager
 	Parent          serverParent
 
@@ -129,6 +140,10 @@ func (s *Server) Initialize() error {
 	s.wg.Add(1)
 	go s.run()
 
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetHLSServer(s)
+	}
+
 	return nil
 }
 
@@ -140,12 +155,30 @@ func (s *Server) Log(level logger.Level, format string, args ...interface{}) {
 // Close closes the server.
 func (s *Server) Close() {
 	s.Log(logger.Info, "listener is closing")
+
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetHLSServer(nil)
+	}
+
 	s.ctxCancel()
 	s.wg.Wait()
 }
 
 func (s *Server) run() {
 	defer s.wg.Done()
+
+	readyPaths := s.PathManager.SetHLSServer(s)
+	defer s.PathManager.SetHLSServer(nil)
+
+	if s.AlwaysRemux {
+		for _, pa := range readyPaths {
+			if !pa.SafeConf().SourceOnDemand {
+				if _, ok := s.muxers[pa.Name()]; !ok {
+					s.createMuxer(pa.Name(), "", "")
+				}
+			}
+		}
+	}
 
 outer:
 	for {

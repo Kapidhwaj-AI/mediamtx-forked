@@ -19,7 +19,7 @@ type Logger struct {
 }
 
 // New allocates a log handler.
-func New(level Level, destinations []Destination, filePath string) (*Logger, error) {
+func New(level Level, destinations []Destination, filePath string, sysLogPrefix string) (*Logger, error) {
 	lh := &Logger{
 		level: level,
 	}
@@ -38,7 +38,7 @@ func New(level Level, destinations []Destination, filePath string) (*Logger, err
 			lh.destinations = append(lh.destinations, dest)
 
 		case DestinationSyslog:
-			dest, err := newDestinationSyslog()
+			dest, err := newDestinationSyslog(sysLogPrefix)
 			if err != nil {
 				lh.Close()
 				return nil, err
@@ -87,10 +87,10 @@ func writeTime(buf *bytes.Buffer, t time.Time, useColor bool) {
 	intbuf.WriteByte(' ')
 
 	// time
-	hour, min, sec := t.Clock()
+	hour, minute, sec := t.Clock()
 	intbuf.Write(itoa(hour, 2))
 	intbuf.WriteByte(':')
-	intbuf.Write(itoa(min, 2))
+	intbuf.Write(itoa(minute, 2))
 	intbuf.WriteByte(':')
 	intbuf.Write(itoa(sec, 2))
 	intbuf.WriteByte(' ')
@@ -136,7 +136,7 @@ func writeLevel(buf *bytes.Buffer, level Level, useColor bool) {
 }
 
 func writeContent(buf *bytes.Buffer, format string, args []interface{}) {
-	buf.Write([]byte(fmt.Sprintf(format, args...)))
+	fmt.Fprintf(buf, format, args...)
 	buf.WriteByte('\n')
 }
 

@@ -11,15 +11,16 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"reflect"
 	"sort"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pion/ice/v2"
+	"github.com/pion/ice/v4"
 	"github.com/pion/logging"
-	pwebrtc "github.com/pion/webrtc/v3"
+	pwebrtc "github.com/pion/webrtc/v4"
 
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
@@ -30,11 +31,15 @@ import (
 )
 
 const (
-	webrtcTurnSecretExpiration = 24 * 3600 * time.Second
+	webrtcTurnSecretExpiration = 24 * time.Hour
 )
 
 // ErrSessionNotFound is returned when a session is not found.
 var ErrSessionNotFound = errors.New("session not found")
+
+func interfaceIsEmpty(i interface{}) bool {
+	return reflect.ValueOf(i).Kind() != reflect.Ptr || reflect.ValueOf(i).IsNil()
+}
 
 type nilWriter struct{}
 
@@ -65,14 +70,14 @@ func randInt63n(n int64) (int64, error) {
 		return r & (n - 1), nil
 	}
 
-	max := int64((1 << 63) - 1 - (1<<63)%uint64(n))
+	maxVal := int64((1 << 63) - 1 - (1<<63)%uint64(n))
 
 	v, err := randInt63()
 	if err != nil {
 		return 0, err
 	}
 
-	for v > max {
+	for v > maxVal {
 		v, err = randInt63()
 		if err != nil {
 			return 0, err
@@ -163,9 +168,13 @@ type webRTCDeleteSessionReq struct {
 	res      chan webRTCDeleteSessionRes
 }
 
+type serverMetrics interface {
+	SetWebRTCServer(defs.APIWebRTCServer)
+}
+
 type serverPathManager interface {
 	FindPathConf(req defs.PathFindPathConfReq) (*conf.Path, error)
-	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, error)
+	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, *stream.Stream, error)
 	AddReader(req defs.PathAddReaderReq) (defs.Path, *stream.Stream, error)
 }
 
@@ -181,16 +190,18 @@ type Server struct {
 	ServerCert            string
 	AllowOrigin           string
 	TrustedProxies        conf.IPNetworks
-	ReadTimeout           conf.StringDuration
+	ReadTimeout           conf.Duration
 	LocalUDPAddress       string
 	LocalTCPAddress       string
 	IPsFromInterfaces     bool
 	IPsFromInterfacesList []string
 	AdditionalHosts       []string
 	ICEServers            []conf.WebRTCICEServer
-	HandshakeTimeout      conf.StringDuration
-	TrackGatherTimeout    conf.StringDuration
+	HandshakeTimeout      conf.Duration
+	TrackGatherTimeout    conf.Duration
+	STUNGatherTimeout     conf.Duration
 	ExternalCmdPool       *externalcmd.Pool
+	Metrics               serverMetrics
 	PathManager           serverPathManager
 	Parent                serverParent
 
@@ -283,6 +294,10 @@ func (s *Server) Initialize() error {
 
 	go s.run()
 
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetWebRTCServer(s)
+	}
+
 	return nil
 }
 
@@ -294,6 +309,11 @@ func (s *Server) Log(level logger.Level, format string, args ...interface{}) {
 // Close closes the server.
 func (s *Server) Close() {
 	s.Log(logger.Info, "listener is closing")
+
+	if !interfaceIsEmpty(s.Metrics) {
+		s.Metrics.SetWebRTCServer(nil)
+	}
+
 	s.ctxCancel()
 	<-s.done
 }
@@ -314,6 +334,9 @@ outer:
 				additionalHosts:       s.AdditionalHosts,
 				iceUDPMux:             s.iceUDPMux,
 				iceTCPMux:             s.iceTCPMux,
+				handshakeTimeout:      s.HandshakeTimeout,
+				trackGatherTimeout:    s.TrackGatherTimeout,
+				stunGatherTimeout:     s.STUNGatherTimeout,
 				req:                   req,
 				wg:                    &wg,
 				externalCmdPool:       s.ExternalCmdPool,

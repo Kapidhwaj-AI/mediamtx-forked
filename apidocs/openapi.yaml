@@ -57,6 +57,8 @@ components:
             type: string
         logFile:
           type: string
+        sysLogPrefix:
+          type: string
         readTimeout:
           type: string
         writeTimeout:
@@ -87,8 +89,16 @@ components:
             $ref: '#/components/schemas/AuthInternalUserPermission'
         authJWTJWKS:
           type: string
+        authJWTJWKSFingerprint:
+          type: string
         authJWTClaimKey:
           type: string
+        authJWTExclude:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuthInternalUserPermission'
+        authJWTInHTTPQuery:
+          type: boolean
 
         # Control API
         api:
@@ -165,11 +175,11 @@ components:
         # RTSP server
         rtsp:
           type: boolean
-        protocols:
+        rtspTransports:
           type: array
           items:
             type: string
-        encryption:
+        rtspEncryption:
           type: string
         rtspAddress:
           type: string
@@ -185,9 +195,17 @@ components:
           type: integer
         multicastRTCPPort:
           type: integer
-        serverKey:
+        srtpAddress:
           type: string
-        serverCert:
+        srtcpAddress:
+          type: string
+        multicastSRTPPort:
+          type: integer
+        multicastSRTCPPort:
+          type: integer
+        rtspServerKey:
+          type: string
+        rtspServerCert:
           type: string
         rtspAuthMethods:
           type: array
@@ -290,6 +308,8 @@ components:
           type: string
         webrtcTrackGatherTimeout:
           type: string
+        webrtcSTUNGatherTimeout:
+          type: string
 
         # SRT server
         srt:
@@ -320,6 +340,8 @@ components:
           type: string
         fallback:
           type: string
+        useAbsoluteTimestamp:
+          type: boolean
 
         # Record
         record:
@@ -329,6 +351,8 @@ components:
         recordFormat:
           type: string
         recordPartDuration:
+          type: string
+        recordMaxPartSize:
           type: string
         recordSegmentDuration:
           type: string
@@ -358,6 +382,8 @@ components:
         # Raspberry Pi Camera source
         rpiCameraCamID:
           type: integer
+        rpiCameraSecondary:
+          type: boolean
         rpiCameraWidth:
           type: integer
         rpiCameraHeight:
@@ -430,6 +456,8 @@ components:
           type: string
         rpiCameraLevel:
           type: string
+        rpiCameraJPEGQuality:
+          type: integer
 
         # Hooks
         runOnInit:
@@ -657,6 +685,9 @@ components:
         bytesSent:
           type: integer
           format: int64
+        session:
+          type: string
+          nullable: true
 
     RTSPConnList:
       type: object
@@ -693,6 +724,30 @@ components:
           type: integer
           format: int64
         bytesSent:
+          type: integer
+          format: int64
+        rtpPacketsReceived:
+          type: integer
+          format: int64
+        rtpPacketsSent:
+          type: integer
+          format: int64
+        rtpPacketsLost:
+          type: integer
+          format: int64
+        rtpPacketsInError:
+          type: integer
+          format: int64
+        rtpPacketsJitter:
+          type: number
+          format: float64
+        rtcpPacketsReceived:
+          type: integer
+          format: int64
+        rtcpPacketsSent:
+          type: integer
+          format: int64
+        rtcpPacketsInError:
           type: integer
           format: int64
 
@@ -989,6 +1044,22 @@ components:
             $ref: '#/components/schemas/WebRTCSession'
 
 paths:
+
+  /v3/auth/jwks/refresh:
+    post:
+      operationId: authJwksRefresh
+      tags: [Authentication]
+      summary: Manually refreshes the JWT JWKS.
+      responses:
+        '200':
+          description: the request was successful.
+        '500':
+          description: server error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /v3/config/global/get:
     get:
       operationId: configGlobalGet

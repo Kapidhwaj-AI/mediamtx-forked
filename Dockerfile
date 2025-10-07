@@ -3,7 +3,7 @@
 # -----------------------------
 # Stage 1: Build Go binary
 # -----------------------------
-FROM golang:1.22.4-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Install required tools
 RUN apk add --no-cache git bash zip curl
@@ -15,13 +15,13 @@ WORKDIR /app
 RUN git clone https://github.com/Kapidhwaj-AI/mediamtx-forked . \
     && git checkout production-edge
 
-# Install Go MySQL driver
-RUN go get github.com/go-sql-driver/mysql
+# Install Go MySQL driver (use go workspaces mode)
+RUN go mod tidy && go get github.com/go-sql-driver/mysql
 
 # Replace config.go with your custom version
-# (Assuming you'll COPY it from your local context
+COPY config.go ./internal/core/config.go
 
-# Generate code and build the binary
+# Generate code and build binary
 RUN go generate ./... && \
     CGO_ENABLED=0 go build -o mediamtx .
 
@@ -33,15 +33,12 @@ FROM alpine:latest
 # Add minimal runtime dependencies
 RUN apk add --no-cache libc6-compat
 
-# Set working directory
 WORKDIR /app
 
-# Copy built binary from builder
+# Copy binary from builder
 COPY --from=builder /app/mediamtx .
 
-# Expose necessary ports (customize as needed)
-EXPOSE 8554 1935 8888 8889 8880
+# Expose typical media server ports (adjust as needed)
+EXPOSE 8554 1935 8888
 
-# Default command
 CMD ["./mediamtx"]
-

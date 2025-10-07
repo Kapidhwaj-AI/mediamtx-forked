@@ -41,7 +41,7 @@ jobs:
       - name: Compute tags
         id: tags
         run: |
-          if [[ "${GITHUB_REF_TYPE}" == "branch" && "${GITHUB_REF_NAME}" == "productionedge" ]]; then
+          if [[ "${GITHUB_REF_TYPE}" == "branch" && "${GITHUB_REF_NAME}" == "production-edge" ]]; then
             echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:canary" >> $GITHUB_OUTPUT
           elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
             echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME_LC }}:${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT

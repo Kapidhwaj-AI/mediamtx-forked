@@ -18,8 +18,6 @@ RUN git clone https://github.com/Kapidhwaj-AI/mediamtx-forked . \
 # Install Go MySQL driver (use go workspaces mode)
 RUN go mod tidy && go get github.com/go-sql-driver/mysql
 
-# Replace config.go with your custom version
-COPY config.go ./internal/core/config.go
 
 # Generate code and build binary
 RUN go generate ./... && \

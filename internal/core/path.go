@@ -11,7 +11,7 @@ import (
 	"time"
 	"strings"
 	"github.com/bluenviron/gortsplib/v4/pkg/description"
-
+	"os"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/externalcmd"
@@ -812,33 +812,61 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	pa.Log(logger.Info, "Starting upload and metadata insert for segment: %s", segmentPath)
 
 	cameraid := pa.name
-	filename := filepath.Base(segmentPath) // e.g. "2025-07-01_13-45-12-123456.mp4"
+	filename := filepath.Base(segmentPath) // e.g. 2025-07-01_13-45-12-123456.mp4
 
 	nameParts := strings.Split(filename, "_")
 	if len(nameParts) < 2 {
-		pa.Log(logger.Info, "Invalid file name format")
+		pa.Log(logger.Info, "Invalid file name format: %s", filename)
 		return
 	}
 
 	datePart := nameParts[0]
-	timePart := strings.Split(nameParts[1], ".")[0] // strip .mp4
+	timePart := strings.TrimSuffix(nameParts[1], filepath.Ext(nameParts[1])) // "13-45-12-123456"
+
 	ymd := strings.Split(datePart, "-")
 	hmsu := strings.Split(timePart, "-")
-	year, _ := strconv.Atoi(ymd[0])
-	month, _ := strconv.Atoi(ymd[1])
-	day, _ := strconv.Atoi(ymd[2])
-	hour, _ := strconv.Atoi(hmsu[0])
-	minute, _ := strconv.Atoi(hmsu[1])
-	second, _ := strconv.Atoi(hmsu[2])
-	microseconds, _ := strconv.Atoi(hmsu[3])
+	if len(ymd) != 3 || len(hmsu) < 3 {
+		pa.Log(logger.Info, "Invalid date/time parts in filename: %s", filename)
+		return
+	}
 
-	t := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, time.UTC)
-	unixTimestamp := t.Unix()
+	year, err := strconv.Atoi(ymd[0]); if err != nil { pa.Log(logger.Info, "year parse: %v", err); return }
+	month, err := strconv.Atoi(ymd[1]); if err != nil { pa.Log(logger.Info, "month parse: %v", err); return }
+	day, err := strconv.Atoi(ymd[2]); if err != nil { pa.Log(logger.Info, "day parse: %v", err); return }
+	hour, err := strconv.Atoi(hmsu[0]); if err != nil { pa.Log(logger.Info, "hour parse: %v", err); return }
+	minute, err := strconv.Atoi(hmsu[1]); if err != nil { pa.Log(logger.Info, "minute parse: %v", err); return }
+	second, err := strconv.Atoi(hmsu[2]); if err != nil { pa.Log(logger.Info, "second parse: %v", err); return }
 
-	// Build GCS path
-	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
+	// microseconds in filename are optional; default 0
+	microseconds := 0
+	if len(hmsu) >= 4 {
+		if mu, e := strconv.Atoi(hmsu[3]); e == nil {
+			microseconds = mu
+		}
+	}
 
-	// ✅ Upload the file to GCS using rclone copyto
+	// Parse in the *true* timezone of the filename timestamp (IST here).
+	// Optionally make it configurable via env var CLIP_TIMESTAMP_TZ.
+	loc := time.Local
+	if tz := os.Getenv("CLIP_TIMESTAMP_TZ"); tz != "" {
+		if l, e := time.LoadLocation(tz); e == nil {
+			loc = l
+		}
+	} else {
+		if l, e := time.LoadLocation("Asia/Kolkata"); e == nil {
+			loc = l
+		}
+	}
+
+	// Build the local time instant, then convert to UTC for storage.
+	tLocal := time.Date(year, time.Month(month), day, hour, minute, second, microseconds*1000, loc)
+	unixTimestamp := tLocal.UTC().Unix() // seconds since epoch for the *same instant*
+
+	// Build destination path
+	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s",
+		cameraid, year, month, day, filename)
+
+	// Upload
 	cmd := exec.Command("rclone", "copyto", segmentPath, gcsPath)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -847,15 +875,12 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	}
 	pa.Log(logger.Info, "rclone upload successful. Output: %s", string(output))
 
-	// ✅ Only after successful upload, insert into DB
-
-	// Build public GCS URL
-
+	// Insert metadata
 	recordedPath := fmt.Sprintf("kapi_bucket_clips/%s/%04d-%02d-%02d/%s", cameraid, year, month, day, filename)
-	
-	_, err = DB.Exec("INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
-		cameraid, unixTimestamp, recordedPath)
-	if err != nil {
+	if _, err = DB.Exec(
+		"INSERT INTO recorded_clips (camera_id, utc_stamp, recorded_path) VALUES (?, ?, ?)",
+		cameraid, unixTimestamp, recordedPath,
+	); err != nil {
 		pa.Log(logger.Info, "Insert into recorded_clips failed: %v", err)
 	} else {
 		pa.Log(logger.Info, "Recording metadata inserted successfully for: %s", recordedPath)

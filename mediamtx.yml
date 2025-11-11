@@ -494,14 +494,14 @@ pathDefaults:
   # MPEG-TS segments are concatenation of 188-bytes packets, flushed to disk with this period.
   # When a system failure occurs, the last part gets lost.
   # Therefore, the part duration is equal to the RPO (recovery point objective).
-  recordPartDuration: 600s
+  recordPartDuration: 30s
   # This prevents RAM exhaustion.
-  recordMaxPartSize: 200M
+  recordMaxPartSize: 50M
   # Minimum duration of each segment.
-  recordSegmentDuration: 600s
+  recordSegmentDuration: 30s
   # Delete segments after this timespan.
   # Set to 0s to disable automatic deletion.
-  recordDeleteAfter: 1800s
+  recordDeleteAfter: 120s
 
   ###############################################
   # Default path settings -> Publisher source (when source is "publisher")

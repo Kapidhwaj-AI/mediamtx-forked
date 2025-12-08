@@ -743,7 +743,7 @@ paths:
 
     runOnDemand: >
       ffmpeg -rtsp_transport tcp -fflags nobuffer -flags low_delay
-      -i rtsp://localhost:$RTSP_PORT/$G1
+      -i rtsp://localhost:$RTSP_PORT/$G1?token=token
       -c:v libx264 -preset veryfast -tune zerolatency
       -g 30 -keyint_min 30 -sc_threshold 0
       -c:a copy

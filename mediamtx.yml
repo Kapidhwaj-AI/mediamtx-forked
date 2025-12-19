@@ -741,11 +741,10 @@ paths:
     source: publisher
     record: no
 
-    runOnRead: /usr/local/bin/onread-rkmpp.sh
+    runOnRead: /usr/local/bin/onread-rkmpp.sh start
+    runOnReadRestart: yes
 
-    runOnDemandRestart: yes
-    runOnDemandStartTimeout: 15s
-    runOnDemandCloseAfter: 15s
+    runOnUnread: /usr/local/bin/onread-rkmpp.sh stop
 
   all_others:
     # inherits your pathDefaults (recording, etc.)

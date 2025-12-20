@@ -741,10 +741,13 @@ paths:
     source: publisher
     record: no
 
-    runOnRead: /usr/local/bin/onread-rkmpp.sh start
-    runOnReadRestart: yes
+    runOnDemand: >
+      /usr/local/bin/mtx-host.sh /usr/local/bin/mtx-avc-transcode.sh
+      "$RTSP_PORT" "$G1" "$MTX_PATH"
 
-    runOnUnread: /usr/local/bin/onread-rkmpp.sh stop
+    runOnDemandRestart: yes
+    runOnDemandStartTimeout: 15s
+    runOnDemandCloseAfter: 15s
 
   all_others:
     # inherits your pathDefaults (recording, etc.)

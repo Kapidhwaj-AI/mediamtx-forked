@@ -12,7 +12,7 @@ logLevel: info
 logDestinations: [file]
 # If "file" is in logDestinations, this is the file which will receive the logs.
 
-logFile: mediamtx.log
+logFile: /mnt/HD_Data/mediamtx.log
 
 
 # Timeout of read operations.
@@ -46,7 +46,7 @@ runOnDisconnect:
 # * internal: users are stored in the configuration file
 # * http: an external HTTP URL is contacted to perform authentication
 # * jwt: an external identity server provides authentication through JWTs
-authMethod: http
+#authMethod: http
 
 # Internal authentication.
 # list of users.
@@ -99,7 +99,7 @@ authInternalUsers:
 # }
 # If the response code is 20x, authentication is accepted, otherwise
 # it is discarded.
-authHTTPAddress: http://localhost:8084/stream-verify
+#authHTTPAddress: http://localhost:8084/stream-verify
 # Actions to exclude from HTTP-based authentication.
 # Format is the same as the one of user permissions.
 authHTTPExclude:
@@ -211,7 +211,7 @@ pprofTrustedProxies: []
 # Global settings -> Playback server
 
 # Enable downloading recordings from the playback server.
-playback: no
+playback: yes
 # Address of the playback server listener.
 playbackAddress: :9996
 # Enable TLS/HTTPS on the playback server.
@@ -486,7 +486,7 @@ pathDefaults:
   # Extension is added automatically.
   # Available variables are %path (path name), %Y %m %d (year, month, day),
   # %H %M %S (hours, minutes, seconds), %f (microseconds), %z (time zone), %s (unix epoch).
-  recordPath: ./recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordPath: /mnt/HD_Data/recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   # Format of recorded segments.
   # Available formats are "fmp4" (fragmented MP4) and "mpegts" (MPEG-TS).
   recordFormat: fmp4
@@ -494,14 +494,14 @@ pathDefaults:
   # MPEG-TS segments are concatenation of 188-bytes packets, flushed to disk with this period.
   # When a system failure occurs, the last part gets lost.
   # Therefore, the part duration is equal to the RPO (recovery point objective).
-  recordPartDuration: 30s
+  recordPartDuration: 30ms
   # This prevents RAM exhaustion.
-  recordMaxPartSize: 50M
+  recordMaxPartSize: 100M
   # Minimum duration of each segment.
-  recordSegmentDuration: 30s
+  recordSegmentDuration: 30m
   # Delete segments after this timespan.
   # Set to 0s to disable automatic deletion.
-  recordDeleteAfter: 120s
+  recordDeleteAfter: 720h
 
   ###############################################
   # Default path settings -> Publisher source (when source is "publisher")

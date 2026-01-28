@@ -18,6 +18,7 @@ require (
 	github.com/gin-gonic/gin v1.10.1
 	github.com/go-git/go-billy/v5 v5.6.2
 	github.com/go-git/go-git/v5 v5.16.2
+	github.com/go-sql-driver/mysql v1.9.3
 	github.com/golang-jwt/jwt/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gookit/color v1.5.4
@@ -45,7 +46,6 @@ require (
 	github.com/ProtonMail/go-crypto v1.1.6 // indirect
 	github.com/asticode/go-astikit v0.30.0 // indirect
 	github.com/benburkert/openpgp v0.0.0-20160410205803-c2471f86866c // indirect
-	github.com/bluenviron/mediacommon v1.14.0 // indirect
 	github.com/bytedance/sonic v1.13.2 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudflare/circl v1.6.1 // indirect
@@ -59,7 +59,6 @@ require (
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
-	github.com/go-sql-driver/mysql v1.9.3 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -101,3 +100,5 @@ require (
 replace github.com/pion/ice/v4 => github.com/aler9/ice/v4 v4.0.0-20250301104324-b2df7db9f75d
 
 replace github.com/pion/webrtc/v4 => github.com/aler9/webrtc/v4 v4.0.0-20250228091429-18796cd12b4f
+
+replace github.com/bluenviron/mediacommon/v2 => github.com/mainavinhoon/mediacommon/v2 v2.0.0-20260128063349-0a9e82f14536

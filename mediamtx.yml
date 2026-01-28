@@ -12,7 +12,7 @@ logLevel: info
 logDestinations: [file]
 # If "file" is in logDestinations, this is the file which will receive the logs.
 
-logFile: /mnt/HD_Data/mediamtx.log
+logFile: /mnt/HD_Data/logs/mediamtx.log
 
 
 # Timeout of read operations.
@@ -302,7 +302,7 @@ rtmpServerCert: server.crt
 # Global settings -> HLS server
 
 # Enable reading streams with the HLS protocol.
-hls: yes
+hls: no
 # Address of the HLS listener.
 hlsAddress: :8888
 # Enable TLS/HTTPS on the HLS server.
@@ -723,7 +723,7 @@ pathDefaults:
   #   a regular expression.
   # * MTX_SEGMENT_PATH: segment file path
   # * MTX_SEGMENT_DURATION: segment duration
-  runOnRecordSegmentComplete: rclone copy ./recordings /mnt/HD_Data
+  #runOnRecordSegmentComplete: rclone copy ./recordings /mnt/HD_Data
   
 
 

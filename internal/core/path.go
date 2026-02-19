@@ -863,7 +863,7 @@ func (pa *path) insertRecordingMetadata(segmentPath string) {
 	unixTimestamp := tLocal.UTC().Unix() // seconds since epoch for the *same instant*
 
 	// Build destination path
-	gcsPath := fmt.Sprintf("/mnt/HD_Data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s",
+	gcsPath := fmt.Sprintf("/data/kapi_bucket_clips/%s/%04d-%02d-%02d/%s",
 		cameraid, year, month, day, filename)
 
 	// Upload

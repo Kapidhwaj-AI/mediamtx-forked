@@ -12,7 +12,7 @@ logLevel: info
 logDestinations: [file]
 # If "file" is in logDestinations, this is the file which will receive the logs.
 
-logFile: /mnt/HD_Data/logs/mediamtx.log
+logFile: /data/logs/mediamtx.log
 
 
 # Timeout of read operations.
@@ -486,7 +486,7 @@ pathDefaults:
   # Extension is added automatically.
   # Available variables are %path (path name), %Y %m %d (year, month, day),
   # %H %M %S (hours, minutes, seconds), %f (microseconds), %z (time zone), %s (unix epoch).
-  recordPath: /mnt/HD_Data/recordings/%path/%Y-%m-%d_%H-%M-%S-%f
+  recordPath: /data/recordings/%path/%Y-%m-%d_%H-%M-%S-%f
   # Format of recorded segments.
   # Available formats are "fmp4" (fragmented MP4) and "mpegts" (MPEG-TS).
   recordFormat: fmp4
@@ -723,7 +723,7 @@ pathDefaults:
   #   a regular expression.
   # * MTX_SEGMENT_PATH: segment file path
   # * MTX_SEGMENT_DURATION: segment duration
-  #runOnRecordSegmentComplete: rclone copy ./recordings /mnt/HD_Data
+  #runOnRecordSegmentComplete: rclone copy ./recordings /data
   
 
 

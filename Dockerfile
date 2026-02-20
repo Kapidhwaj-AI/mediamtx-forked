@@ -34,11 +34,11 @@ WORKDIR /app
 COPY --from=builder /app/mediamtx .
 
 # Optionally copy config if it’s in your repo
-COPY mediamtx.yml /app/mediamtx.yml
+#COPY mediamtx.yml /app/mediamtx.yml
 
 # Expose typical ports
 EXPOSE 8554/tcp 1935/tcp 8888/tcp 8889/tcp
 EXPOSE 8000-8100/udp
 
 # Default run command
-CMD ["./mediamtx", "mediamtx.yml"]
+CMD ["./mediamtx", "/app/mediamtx.yml"]

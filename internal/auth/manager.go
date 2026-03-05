@@ -27,31 +27,12 @@ const (
 	jwksRefreshPeriod = 60 * 60 * time.Second
 )
 
-func isHTTPRequest(r *Request) bool {
-	switch r.Action {
-	case conf.AuthActionPlayback, conf.AuthActionAPI,
-		conf.AuthActionMetrics, conf.AuthActionPprof:
-		return true
-	}
-
-	switch r.Protocol {
-	case ProtocolHLS, ProtocolWebRTC:
-		return true
-	}
-
-	return false
-}
-
-// Error is a authentication error.
-type Error struct {
-	Wrapped        error
-	Message        string
-	AskCredentials bool
-}
-
-// Error implements the error interface.
-func (e Error) Error() string {
-	return "authentication failed: " + e.Wrapped.Error()
+func isHTTP(req *Request) bool {
+	return req.Protocol == ProtocolHLS || req.Protocol == ProtocolWebRTC ||
+		req.Action == conf.AuthActionPlayback ||
+		req.Action == conf.AuthActionAPI ||
+		req.Action == conf.AuthActionMetrics ||
+		req.Action == conf.AuthActionPprof
 }
 
 func matchesPermission(perms []conf.AuthInternalUserPermission, req *Request) bool {
@@ -87,6 +68,7 @@ type Manager struct {
 	Method             conf.AuthMethod
 	InternalUsers      []conf.AuthInternalUser
 	HTTPAddress        string
+	HTTPFingerprint    string
 	HTTPExclude        []conf.AuthInternalUserPermission
 	JWTJWKS            string
 	JWTJWKSFingerprint string
@@ -108,7 +90,7 @@ func (m *Manager) ReloadInternalUsers(u []conf.AuthInternalUser) {
 }
 
 // Authenticate authenticates a request.
-func (m *Manager) Authenticate(req *Request) error {
+func (m *Manager) Authenticate(req *Request) *Error {
 	var err error
 
 	switch m.Method {
@@ -123,9 +105,9 @@ func (m *Manager) Authenticate(req *Request) error {
 	}
 
 	if err != nil {
-		return Error{
+		return &Error{
 			Wrapped:        err,
-			AskCredentials: m.Method != conf.AuthMethodJWT && req.Credentials.User == "" && req.Credentials.Pass == "",
+			AskCredentials: (req.Credentials.User == "" && req.Credentials.Pass == "" && req.Credentials.Token == ""),
 		}
 	}
 
@@ -199,14 +181,29 @@ func (m *Manager) authenticateHTTP(req *Request) error {
 		Query:    req.Query,
 	})
 
-	res, err := http.Post(m.HTTPAddress, "application/json", bytes.NewReader(enc))
+	u, err := url.Parse(m.HTTPAddress)
+	if err != nil {
+		return err
+	}
+
+	tr := &http.Transport{
+		TLSClientConfig: tls.MakeConfig(u.Hostname(), m.HTTPFingerprint),
+	}
+	defer tr.CloseIdleConnections()
+
+	httpClient := &http.Client{
+		Timeout:   m.ReadTimeout,
+		Transport: tr,
+	}
+
+	res, err := httpClient.Post(m.HTTPAddress, "application/json", bytes.NewReader(enc))
 	if err != nil {
 		return fmt.Errorf("HTTP request failed: %w", err)
 	}
 	defer res.Body.Close()
 
 	if res.StatusCode < 200 || res.StatusCode > 299 {
-		if resBody, err := io.ReadAll(res.Body); err == nil && len(resBody) != 0 {
+		if resBody, err2 := io.ReadAll(res.Body); err2 == nil && len(resBody) != 0 {
 			return fmt.Errorf("server replied with code %d: %s", res.StatusCode, string(resBody))
 		}
 
@@ -235,7 +232,8 @@ func (m *Manager) authenticateJWT(req *Request) error {
 	case req.Credentials.Pass != "":
 		encodedJWT = req.Credentials.Pass
 
-	case (!isHTTPRequest(req) || m.JWTInHTTPQuery):
+		// always allow passing JWT through query parameters with RTSP and RTMP since there's no alternative.
+	case req.Protocol == ProtocolRTSP || req.Protocol == ProtocolRTMP || (isHTTP(req) && m.JWTInHTTPQuery):
 		var v url.Values
 		v, err = url.ParseQuery(req.Query)
 		if err != nil {
@@ -273,8 +271,13 @@ func (m *Manager) pullJWTJWKS() (jwt.Keyfunc, error) {
 	defer m.mutex.Unlock()
 
 	if now.Sub(m.jwksLastRefresh) >= jwksRefreshPeriod {
+		u, err := url.Parse(m.JWTJWKS)
+		if err != nil {
+			return nil, err
+		}
+
 		tr := &http.Transport{
-			TLSClientConfig: tls.ConfigForFingerprint(m.JWTJWKSFingerprint),
+			TLSClientConfig: tls.MakeConfig(u.Hostname(), m.JWTJWKSFingerprint),
 		}
 		defer tr.CloseIdleConnections()
 

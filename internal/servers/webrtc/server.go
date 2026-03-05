@@ -22,10 +22,12 @@ import (
 	"github.com/pion/logging"
 	pwebrtc "github.com/pion/webrtc/v4"
 
+	"github.com/bluenviron/gortsplib/v5/pkg/readbuffer"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/externalcmd"
 	"github.com/bluenviron/mediamtx/internal/logger"
+	"github.com/bluenviron/mediamtx/internal/protocols/webrtc"
 	"github.com/bluenviron/mediamtx/internal/restrictnetwork"
 	"github.com/bluenviron/mediamtx/internal/stream"
 )
@@ -37,8 +39,8 @@ const (
 // ErrSessionNotFound is returned when a session is not found.
 var ErrSessionNotFound = errors.New("session not found")
 
-func interfaceIsEmpty(i interface{}) bool {
-	return reflect.ValueOf(i).Kind() != reflect.Ptr || reflect.ValueOf(i).IsNil()
+func interfaceIsEmpty(i any) bool {
+	return reflect.ValueOf(i).Kind() != reflect.Pointer || reflect.ValueOf(i).IsNil()
 }
 
 type nilWriter struct{}
@@ -174,7 +176,7 @@ type serverMetrics interface {
 
 type serverPathManager interface {
 	FindPathConf(req defs.PathFindPathConfReq) (*conf.Path, error)
-	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, *stream.Stream, error)
+	AddPublisher(req defs.PathAddPublisherReq) (defs.Path, *stream.SubStream, error)
 	AddReader(req defs.PathAddReaderReq) (defs.Path, *stream.Stream, error)
 }
 
@@ -185,21 +187,24 @@ type serverParent interface {
 // Server is a WebRTC server.
 type Server struct {
 	Address               string
+	DumpPackets           bool
 	Encryption            bool
 	ServerKey             string
 	ServerCert            string
-	AllowOrigin           string
+	AllowOrigins          []string
 	TrustedProxies        conf.IPNetworks
 	ReadTimeout           conf.Duration
+	WriteTimeout          conf.Duration
+	UDPReadBufferSize     uint
 	LocalUDPAddress       string
 	LocalTCPAddress       string
 	IPsFromInterfaces     bool
 	IPsFromInterfacesList []string
 	AdditionalHosts       []string
 	ICEServers            []conf.WebRTCICEServer
+	STUNGatherTimeout     conf.Duration
 	HandshakeTimeout      conf.Duration
 	TrackGatherTimeout    conf.Duration
-	STUNGatherTimeout     conf.Duration
 	ExternalCmdPool       *externalcmd.Pool
 	Metrics               serverMetrics
 	PathManager           serverPathManager
@@ -211,7 +216,7 @@ type Server struct {
 	udpMuxLn         net.PacketConn
 	tcpMuxLn         net.Listener
 	iceUDPMux        ice.UDPMux
-	iceTCPMux        ice.TCPMux
+	iceTCPMux        *webrtc.TCPMuxWrapper
 	sessions         map[*session]struct{}
 	sessionsBySecret map[uuid.UUID]*session
 
@@ -247,12 +252,14 @@ func (s *Server) Initialize() error {
 
 	s.httpServer = &httpServer{
 		address:        s.Address,
+		dumpPackets:    s.DumpPackets,
 		encryption:     s.Encryption,
 		serverKey:      s.ServerKey,
 		serverCert:     s.ServerCert,
-		allowOrigin:    s.AllowOrigin,
+		allowOrigins:   s.AllowOrigins,
 		trustedProxies: s.TrustedProxies,
 		readTimeout:    s.ReadTimeout,
+		writeTimeout:   s.WriteTimeout,
 		pathManager:    s.PathManager,
 		parent:         s,
 	}
@@ -269,18 +276,35 @@ func (s *Server) Initialize() error {
 			ctxCancel()
 			return err
 		}
+
+		if s.UDPReadBufferSize != 0 {
+			err = readbuffer.SetReadBuffer(s.udpMuxLn.(*net.UDPConn), int(s.UDPReadBufferSize))
+			if err != nil {
+				s.udpMuxLn.Close()
+				s.httpServer.close()
+				ctxCancel()
+				return err
+			}
+		}
+
 		s.iceUDPMux = pwebrtc.NewICEUDPMux(webrtcNilLogger, s.udpMuxLn)
 	}
 
 	if s.LocalTCPAddress != "" {
 		s.tcpMuxLn, err = net.Listen(restrictnetwork.Restrict("tcp", s.LocalTCPAddress))
 		if err != nil {
-			s.udpMuxLn.Close()
+			if s.udpMuxLn != nil {
+				s.udpMuxLn.Close()
+			}
 			s.httpServer.close()
 			ctxCancel()
 			return err
 		}
-		s.iceTCPMux = pwebrtc.NewICETCPMux(webrtcNilLogger, s.tcpMuxLn, 8)
+
+		s.iceTCPMux = &webrtc.TCPMuxWrapper{
+			Mux: pwebrtc.NewICETCPMux(webrtcNilLogger, s.tcpMuxLn, 8),
+			Ln:  s.tcpMuxLn,
+		}
 	}
 
 	str := "listener opened on " + s.Address + " (HTTP)"
@@ -302,7 +326,7 @@ func (s *Server) Initialize() error {
 }
 
 // Log implements logger.Writer.
-func (s *Server) Log(level logger.Level, format string, args ...interface{}) {
+func (s *Server) Log(level logger.Level, format string, args ...any) {
 	s.Parent.Log(level, "[WebRTC] "+format, args...)
 }
 
@@ -328,15 +352,16 @@ outer:
 		select {
 		case req := <-s.chNewSession:
 			sx := &session{
+				udpReadBufferSize:     s.UDPReadBufferSize,
 				parentCtx:             s.ctx,
 				ipsFromInterfaces:     s.IPsFromInterfaces,
 				ipsFromInterfacesList: s.IPsFromInterfacesList,
 				additionalHosts:       s.AdditionalHosts,
 				iceUDPMux:             s.iceUDPMux,
 				iceTCPMux:             s.iceTCPMux,
+				stunGatherTimeout:     s.STUNGatherTimeout,
 				handshakeTimeout:      s.HandshakeTimeout,
 				trackGatherTimeout:    s.TrackGatherTimeout,
-				stunGatherTimeout:     s.STUNGatherTimeout,
 				req:                   req,
 				wg:                    &wg,
 				externalCmdPool:       s.ExternalCmdPool,
@@ -376,11 +401,11 @@ outer:
 
 		case req := <-s.chAPISessionsList:
 			data := &defs.APIWebRTCSessionList{
-				Items: []*defs.APIWebRTCSession{},
+				Items: []defs.APIWebRTCSession{},
 			}
 
 			for sx := range s.sessions {
-				data.Items = append(data.Items, sx.apiItem())
+				data.Items = append(data.Items, *sx.apiItem())
 			}
 
 			sort.Slice(data.Items, func(i, j int) bool {

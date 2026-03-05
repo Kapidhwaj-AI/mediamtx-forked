@@ -1,7 +1,7 @@
 package test
 
 import (
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 )
 
@@ -44,9 +44,10 @@ var FormatH265 = &format.H265{
 var FormatMPEG4Audio = &format.MPEG4Audio{
 	PayloadTyp: 96,
 	Config: &mpeg4audio.AudioSpecificConfig{
-		Type:         2,
-		SampleRate:   44100,
-		ChannelCount: 2,
+		Type:          2,
+		SampleRate:    44100,
+		ChannelCount:  2,
+		ChannelConfig: 2,
 	},
 	SizeLength:       13,
 	IndexLength:      3,

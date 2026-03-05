@@ -72,7 +72,7 @@ html, body {
 <div id="message"></div>
 <div id="lang-icon"><div id="lang-list"></div></div>
 
-<script src="hls.min.js"></script>
+<script defer src="hls.min.js"></script>
 
 <script>
 
@@ -187,17 +187,16 @@ const loadAttributesFromQuery = () => {
 	video.muted = parseBoolString(params.get('muted'), true);
 	video.autoplay = parseBoolString(params.get('autoplay'), true);
 	video.playsInline = parseBoolString(params.get('playsinline'), true);
+	video.disablepictureinpicture = parseBoolString(params.get('disablepictureinpicture'), false);
 	defaultControls = video.controls;
-};
-
-const init = () => {
-	loadAttributesFromQuery();
-	loadStream();
 };
 
 // use load instead of DOMContentLoaded, otherwise, in Firefox,
 // the page gets stuck in the "loading" state.
-window.addEventListener('load', init);
+window.addEventListener('load', () => {
+	loadAttributesFromQuery();
+	loadStream();
+});
 
 </script>
 

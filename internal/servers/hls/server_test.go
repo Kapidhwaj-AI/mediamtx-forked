@@ -11,11 +11,13 @@ import (
 
 	"github.com/bluenviron/gohlslib/v2"
 	"github.com/bluenviron/gohlslib/v2/pkg/codecs"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
+	"github.com/bluenviron/mediamtx/internal/auth"
 	"github.com/bluenviron/mediamtx/internal/conf"
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/externalcmd"
+	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/stream"
 	"github.com/bluenviron/mediamtx/internal/test"
 	"github.com/bluenviron/mediamtx/internal/unit"
@@ -65,11 +67,12 @@ func (pa *dummyPath) RemoveReader(_ defs.PathRemoveReaderReq) {
 
 func TestServerPreflightRequest(t *testing.T) {
 	s := &Server{
-		Address:     "127.0.0.1:8888",
-		AllowOrigin: "*",
-		ReadTimeout: conf.Duration(10 * time.Second),
-		PathManager: &dummyPathManager{},
-		Parent:      test.NilLogger,
+		Address:      "127.0.0.1:8888",
+		AllowOrigins: []string{"*"},
+		ReadTimeout:  conf.Duration(10 * time.Second),
+		WriteTimeout: conf.Duration(10 * time.Second),
+		PathManager:  &dummyPathManager{},
+		Parent:       test.NilLogger,
 	}
 	err := s.Initialize()
 	require.NoError(t, err)
@@ -128,10 +131,10 @@ func TestServerNotFound(t *testing.T) {
 				SegmentDuration: conf.Duration(1 * time.Second),
 				PartDuration:    conf.Duration(200 * time.Millisecond),
 				SegmentMaxSize:  50 * 1024 * 1024,
-				AllowOrigin:     "",
 				TrustedProxies:  conf.IPNetworks{},
 				Directory:       "",
 				ReadTimeout:     conf.Duration(10 * time.Second),
+				WriteTimeout:    conf.Duration(10 * time.Second),
 				PathManager:     pm,
 				Parent:          test.NilLogger,
 			}
@@ -144,20 +147,24 @@ func TestServerNotFound(t *testing.T) {
 			hc := &http.Client{Transport: tr}
 
 			func() {
-				req, err := http.NewRequest(http.MethodGet, "http://myuser:mypass@127.0.0.1:8888/nonexisting/", nil)
+				var req *http.Request
+				req, err = http.NewRequest(http.MethodGet, "http://myuser:mypass@127.0.0.1:8888/nonexisting/", nil)
 				require.NoError(t, err)
 
-				res, err := hc.Do(req)
+				var res *http.Response
+				res, err = hc.Do(req)
 				require.NoError(t, err)
 				defer res.Body.Close()
 				require.Equal(t, http.StatusOK, res.StatusCode)
 			}()
 
 			func() {
-				req, err := http.NewRequest(http.MethodGet, "http://myuser:mypass@127.0.0.1:8888/nonexisting/index.m3u8", nil)
+				var req *http.Request
+				req, err = http.NewRequest(http.MethodGet, "http://myuser:mypass@127.0.0.1:8888/nonexisting/index.m3u8", nil)
 				require.NoError(t, err)
 
-				res, err := hc.Do(req)
+				var res *http.Response
+				res, err = hc.Do(req)
 				require.NoError(t, err)
 				defer res.Body.Close()
 				require.Equal(t, http.StatusNotFound, res.StatusCode)
@@ -178,13 +185,20 @@ func TestServerRead(t *testing.T) {
 			}}
 
 			strm := &stream.Stream{
-				WriteQueueSize:     512,
-				RTPMaxPayloadSize:  1450,
-				Desc:               desc,
-				GenerateRTPPackets: true,
-				Parent:             test.NilLogger,
+				Desc:              desc,
+				WriteQueueSize:    512,
+				RTPMaxPayloadSize: 1450,
+				ReplaceNTP:        false,
+				Parent:            test.NilLogger,
 			}
 			err := strm.Initialize()
+			require.NoError(t, err)
+
+			subStream := &stream.SubStream{
+				Stream:        strm,
+				UseRTPPackets: false,
+			}
+			err = subStream.Initialize()
 			require.NoError(t, err)
 
 			pm := &dummyPathManager{
@@ -218,6 +232,7 @@ func TestServerRead(t *testing.T) {
 					SegmentMaxSize:  50 * 1024 * 1024,
 					TrustedProxies:  conf.IPNetworks{},
 					ReadTimeout:     conf.Duration(10 * time.Second),
+					WriteTimeout:    conf.Duration(10 * time.Second),
 					PathManager:     pm,
 					Parent:          test.NilLogger,
 				}
@@ -226,7 +241,8 @@ func TestServerRead(t *testing.T) {
 				defer s.Close()
 
 				c := &gohlslib.Client{
-					URI: "http://myuser:mypass@127.0.0.1:8888/teststream/index.m3u8?param=value",
+					URI:           "http://myuser:mypass@127.0.0.1:8888/teststream/index.m3u8?param=value",
+					StartDistance: 1,
 				}
 
 				recv1 := make(chan struct{})
@@ -241,9 +257,10 @@ func TestServerRead(t *testing.T) {
 						{
 							Codec: &codecs.MPEG4Audio{
 								Config: mpeg4audio.AudioSpecificConfig{
-									Type:         2,
-									ChannelCount: 2,
-									SampleRate:   44100,
+									Type:          2,
+									ChannelCount:  2,
+									ChannelConfig: 2,
+									SampleRate:    44100,
 								},
 							},
 							ClockRate: 90000,
@@ -274,24 +291,20 @@ func TestServerRead(t *testing.T) {
 				require.NoError(t, err)
 				defer c.Close()
 
-				time.Sleep(100 * time.Millisecond)
+				strm.WaitForReaders()
 
-				for i := 0; i < 4; i++ {
-					strm.WriteUnit(test.MediaH264, test.FormatH264, &unit.H264{
-						Base: unit.Base{
-							NTP: time.Time{},
-							PTS: int64(i) * 90000,
-						},
-						AU: [][]byte{
+				for i := range 2 {
+					subStream.WriteUnit(test.MediaH264, test.FormatH264, &unit.Unit{
+						NTP: time.Time{},
+						PTS: int64(i) * 90000,
+						Payload: unit.PayloadH264{
 							{5, 1}, // IDR
 						},
 					})
-					strm.WriteUnit(test.MediaMPEG4Audio, test.FormatMPEG4Audio, &unit.MPEG4Audio{
-						Base: unit.Base{
-							NTP: time.Time{},
-							PTS: int64(i) * 44100,
-						},
-						AUs: [][]byte{{1, 2}},
+					subStream.WriteUnit(test.MediaMPEG4Audio, test.FormatMPEG4Audio, &unit.Unit{
+						NTP:     time.Time{},
+						PTS:     int64(i) * 44100,
+						Payload: unit.PayloadMPEG4Audio{{1, 2}},
 					})
 				}
 
@@ -309,6 +322,7 @@ func TestServerRead(t *testing.T) {
 					SegmentMaxSize:  50 * 1024 * 1024,
 					TrustedProxies:  conf.IPNetworks{},
 					ReadTimeout:     conf.Duration(10 * time.Second),
+					WriteTimeout:    conf.Duration(10 * time.Second),
 					PathManager:     pm,
 					Parent:          test.NilLogger,
 				}
@@ -318,31 +332,26 @@ func TestServerRead(t *testing.T) {
 
 				s.PathReady(&dummyPath{})
 
-				strm.WaitRunningReader()
+				strm.WaitForReaders()
 
-				for i := range 4 {
-					strm.WriteUnit(test.MediaH264, test.FormatH264, &unit.H264{
-						Base: unit.Base{
-							NTP: time.Time{},
-							PTS: int64(i) * 90000,
-						},
-						AU: [][]byte{
+				for i := range 2 {
+					subStream.WriteUnit(test.MediaH264, test.FormatH264, &unit.Unit{
+						NTP: time.Time{},
+						PTS: int64(i) * 90000,
+						Payload: unit.PayloadH264{
 							{5, 1}, // IDR
 						},
 					})
-					strm.WriteUnit(test.MediaMPEG4Audio, test.FormatMPEG4Audio, &unit.MPEG4Audio{
-						Base: unit.Base{
-							NTP: time.Time{},
-							PTS: int64(i) * 44100,
-						},
-						AUs: [][]byte{{1, 2}},
+					subStream.WriteUnit(test.MediaMPEG4Audio, test.FormatMPEG4Audio, &unit.Unit{
+						NTP:     time.Time{},
+						PTS:     int64(i) * 44100,
+						Payload: unit.PayloadMPEG4Audio{{1, 2}},
 					})
 				}
 
-				time.Sleep(100 * time.Millisecond)
-
 				c := &gohlslib.Client{
-					URI: "http://myuser:mypass@127.0.0.1:8888/teststream/index.m3u8?param=value",
+					URI:           "http://myuser:mypass@127.0.0.1:8888/teststream/index.m3u8?param=value",
+					StartDistance: 1,
 				}
 
 				recv1 := make(chan struct{})
@@ -357,9 +366,10 @@ func TestServerRead(t *testing.T) {
 						{
 							Codec: &codecs.MPEG4Audio{
 								Config: mpeg4audio.AudioSpecificConfig{
-									Type:         2,
-									ChannelCount: 2,
-									SampleRate:   44100,
+									Type:          2,
+									ChannelCount:  2,
+									ChannelConfig: 2,
+									SampleRate:    44100,
 								},
 							},
 							ClockRate: 90000,
@@ -405,13 +415,19 @@ func TestServerDirectory(t *testing.T) {
 	desc := &description.Session{Medias: []*description.Media{test.MediaH264}}
 
 	strm := &stream.Stream{
-		WriteQueueSize:     512,
-		RTPMaxPayloadSize:  1450,
-		Desc:               desc,
-		GenerateRTPPackets: true,
-		Parent:             test.NilLogger,
+		Desc:              desc,
+		WriteQueueSize:    512,
+		RTPMaxPayloadSize: 1450,
+		Parent:            test.NilLogger,
 	}
 	err = strm.Initialize()
+	require.NoError(t, err)
+
+	subStream := &stream.SubStream{
+		Stream:        strm,
+		UseRTPPackets: false,
+	}
+	err = subStream.Initialize()
 	require.NoError(t, err)
 
 	pm := &dummyPathManager{
@@ -431,10 +447,10 @@ func TestServerDirectory(t *testing.T) {
 		SegmentDuration: conf.Duration(1 * time.Second),
 		PartDuration:    conf.Duration(200 * time.Millisecond),
 		SegmentMaxSize:  50 * 1024 * 1024,
-		AllowOrigin:     "",
 		TrustedProxies:  conf.IPNetworks{},
 		Directory:       filepath.Join(dir, "mydir"),
 		ReadTimeout:     conf.Duration(10 * time.Second),
+		WriteTimeout:    conf.Duration(10 * time.Second),
 		PathManager:     pm,
 		Parent:          test.NilLogger,
 	}
@@ -454,13 +470,19 @@ func TestServerDynamicAlwaysRemux(t *testing.T) {
 	desc := &description.Session{Medias: []*description.Media{test.MediaH264}}
 
 	strm := &stream.Stream{
-		WriteQueueSize:     512,
-		RTPMaxPayloadSize:  1450,
-		Desc:               desc,
-		GenerateRTPPackets: true,
-		Parent:             test.NilLogger,
+		Desc:              desc,
+		WriteQueueSize:    512,
+		RTPMaxPayloadSize: 1450,
+		Parent:            test.NilLogger,
 	}
 	err := strm.Initialize()
+	require.NoError(t, err)
+
+	subStream := &stream.SubStream{
+		Stream:        strm,
+		UseRTPPackets: false,
+	}
+	err = subStream.Initialize()
 	require.NoError(t, err)
 
 	done := make(chan struct{})
@@ -487,6 +509,7 @@ func TestServerDynamicAlwaysRemux(t *testing.T) {
 		PartDuration:    conf.Duration(200 * time.Millisecond),
 		SegmentMaxSize:  50 * 1024 * 1024,
 		ReadTimeout:     conf.Duration(10 * time.Second),
+		WriteTimeout:    conf.Duration(10 * time.Second),
 		PathManager:     pm,
 		Parent:          test.NilLogger,
 	}
@@ -495,4 +518,68 @@ func TestServerDynamicAlwaysRemux(t *testing.T) {
 	defer s.Close()
 
 	<-done
+}
+
+func TestAuthError(t *testing.T) {
+	n := 0
+
+	s := &Server{
+		Address:         "127.0.0.1:8888",
+		Encryption:      false,
+		ServerKey:       "",
+		ServerCert:      "",
+		AlwaysRemux:     true,
+		Variant:         conf.HLSVariant(gohlslib.MuxerVariantMPEGTS),
+		SegmentCount:    7,
+		SegmentDuration: conf.Duration(1 * time.Second),
+		PartDuration:    conf.Duration(200 * time.Millisecond),
+		SegmentMaxSize:  50 * 1024 * 1024,
+		ReadTimeout:     conf.Duration(10 * time.Second),
+		WriteTimeout:    conf.Duration(10 * time.Second),
+		PathManager: &dummyPathManager{
+			findPathConfImpl: func(req defs.PathFindPathConfReq) (*conf.Path, error) {
+				if req.AccessRequest.Credentials.User == "" && req.AccessRequest.Credentials.Pass == "" {
+					return nil, &auth.Error{AskCredentials: true}
+				}
+
+				return nil, &auth.Error{Wrapped: fmt.Errorf("auth error")}
+			},
+		},
+		Parent: test.Logger(func(l logger.Level, s string, i ...any) {
+			if l == logger.Info {
+				if n == 1 {
+					require.Regexp(t, "failed to authenticate: auth error$", fmt.Sprintf(s, i...))
+				}
+				n++
+			}
+		}),
+	}
+	err := s.Initialize()
+	require.NoError(t, err)
+	defer s.Close()
+
+	req, err := http.NewRequest(http.MethodGet, "http://127.0.0.1:8888/stream/index.m3u8", nil)
+	require.NoError(t, err)
+
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
+	require.Equal(t, `Basic realm="mediamtx"`, res.Header.Get("WWW-Authenticate"))
+
+	req, err = http.NewRequest(http.MethodGet, "http://myuser:mypass@127.0.0.1:8888/stream/index.m3u8", nil)
+	require.NoError(t, err)
+
+	start := time.Now()
+
+	res, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	require.Greater(t, time.Since(start), 2*time.Second)
+
+	require.Equal(t, http.StatusUnauthorized, res.StatusCode)
+
+	require.Equal(t, 2, n)
 }

@@ -7,8 +7,8 @@ import (
 	"testing"
 
 	"github.com/asticode/go-astits"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
-	"github.com/bluenviron/gortsplib/v4/pkg/format"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/bluenviron/mediacommon/v2/pkg/codecs/mpeg4audio"
 	"github.com/bluenviron/mediamtx/internal/logger"
 	"github.com/bluenviron/mediamtx/internal/test"
@@ -134,9 +134,10 @@ func TestToStream(t *testing.T) {
 							Programs: []*mpeg4audio.StreamMuxConfigProgram{{
 								Layers: []*mpeg4audio.StreamMuxConfigLayer{{
 									AudioSpecificConfig: &mpeg4audio.AudioSpecificConfig{
-										Type:         2,
-										SampleRate:   48000,
-										ChannelCount: 2,
+										Type:          2,
+										SampleRate:    48000,
+										ChannelCount:  2,
+										ChannelConfig: 2,
 									},
 									LatmBufferFullness: 255,
 								}},
@@ -168,7 +169,7 @@ func TestToStreamNoSupportedCodecs(t *testing.T) {
 	err = r.Initialize()
 	require.NoError(t, err)
 
-	l := test.Logger(func(logger.Level, string, ...interface{}) {
+	l := test.Logger(func(logger.Level, string, ...any) {
 		t.Error("should not happen")
 	})
 	_, err = ToStream(r, nil, l)
@@ -202,7 +203,7 @@ func TestToStreamSkipUnsupportedTracks(t *testing.T) {
 
 	n := 0
 
-	l := test.Logger(func(l logger.Level, format string, args ...interface{}) {
+	l := test.Logger(func(l logger.Level, format string, args ...any) {
 		require.Equal(t, logger.Warn, l)
 		if n == 0 {
 			require.Equal(t, "skipping track 1 (unsupported codec)", fmt.Sprintf(format, args...))

@@ -1,15 +1,17 @@
 package rtsp
 
 import (
+	"context"
 	"crypto/tls"
 	"os"
 	"testing"
 	"time"
 
-	"github.com/bluenviron/gortsplib/v4"
-	"github.com/bluenviron/gortsplib/v4/pkg/auth"
-	"github.com/bluenviron/gortsplib/v4/pkg/base"
-	"github.com/bluenviron/gortsplib/v4/pkg/description"
+	"github.com/bluenviron/gortsplib/v5"
+	"github.com/bluenviron/gortsplib/v5/pkg/auth"
+	"github.com/bluenviron/gortsplib/v5/pkg/base"
+	"github.com/bluenviron/gortsplib/v5/pkg/description"
+	"github.com/bluenviron/gortsplib/v5/pkg/format"
 	"github.com/pion/rtp"
 	"github.com/stretchr/testify/require"
 
@@ -17,6 +19,12 @@ import (
 	"github.com/bluenviron/mediamtx/internal/defs"
 	"github.com/bluenviron/mediamtx/internal/test"
 )
+
+func ptrOf[T any](v T) *T {
+	p := new(T)
+	*p = v
+	return p
+}
 
 type testServer struct {
 	onDescribe func(*gortsplib.ServerHandlerOnDescribeCtx) (*base.Response, *gortsplib.ServerStream, error)
@@ -134,51 +142,59 @@ func TestSource(t *testing.T) {
 			require.NoError(t, err)
 			defer strm.Close()
 
-			var te *test.SourceTester
-
-			if source != "tls" {
-				var sp conf.RTSPTransport
-				sp.UnmarshalJSON([]byte(`"` + source + `"`)) //nolint:errcheck
-
-				te = test.NewSourceTester(
-					func(p defs.StaticSourceParent) defs.StaticSource {
-						return &Source{
-							ReadTimeout:    conf.Duration(10 * time.Second),
-							WriteTimeout:   conf.Duration(10 * time.Second),
-							WriteQueueSize: 2048,
-							Parent:         p,
-						}
-					},
-					"rtsp://testuser:testpass@localhost:8555/teststream",
-					&conf.Path{
-						RTSPTransport: sp,
-					},
-				)
-			} else {
-				te = test.NewSourceTester(
-					func(p defs.StaticSourceParent) defs.StaticSource {
-						return &Source{
-							ReadTimeout:    conf.Duration(10 * time.Second),
-							WriteTimeout:   conf.Duration(10 * time.Second),
-							WriteQueueSize: 2048,
-							Parent:         p,
-						}
-					},
-					"rtsps://testuser:testpass@localhost:8555/teststream",
-					&conf.Path{
-						SourceFingerprint: "33949E05FFFB5FF3E8AA16F8213A6251B4D9363804BA53233C4DA9A46D6F2739",
-					},
-				)
+			var ur string
+			cnf := &conf.Path{
+				RTSPUDPSourcePortRange: []uint{10000, 65535},
 			}
 
-			defer te.Close()
+			if source != "tls" {
+				ur = "rtsp://testuser:testpass@localhost:8555/teststream"
+				var sp conf.RTSPTransport
+				sp.UnmarshalJSON([]byte(`"` + source + `"`)) //nolint:errcheck
+				cnf.RTSPTransport = sp
+			} else {
+				ur = "rtsps://testuser:testpass@localhost:8555/teststream"
+				cnf.SourceFingerprint = "33949E05FFFB5FF3E8AA16F8213A6251B4D9363804BA53233C4DA9A46D6F2739"
+			}
 
-			<-te.Unit
+			p := &test.StaticSourceParent{}
+			p.Initialize()
+			defer p.Close()
+
+			so := &Source{
+				ReadTimeout:    conf.Duration(10 * time.Second),
+				WriteTimeout:   conf.Duration(10 * time.Second),
+				WriteQueueSize: 2048,
+				Parent:         p,
+			}
+
+			done := make(chan struct{})
+			defer func() { <-done }()
+
+			ctx, ctxCancel := context.WithCancel(context.Background())
+			defer ctxCancel()
+
+			reloadConf := make(chan *conf.Path)
+
+			go func() {
+				so.Run(defs.StaticSourceRunParams{ //nolint:errcheck
+					Context:        ctx,
+					ResolvedSource: ur,
+					Conf:           cnf,
+					ReloadConf:     reloadConf,
+				})
+				close(done)
+			}()
+
+			<-p.Unit
+
+			// the source must be listening on ReloadConf
+			reloadConf <- nil
 		})
 	}
 }
 
-func TestSourceNoPassword(t *testing.T) {
+func TestNoPassword(t *testing.T) {
 	var strm *gortsplib.ServerStream
 
 	nonce, err := auth.GenerateNonce()
@@ -248,26 +264,39 @@ func TestSourceNoPassword(t *testing.T) {
 	var sp conf.RTSPTransport
 	sp.UnmarshalJSON([]byte(`"tcp"`)) //nolint:errcheck
 
-	te := test.NewSourceTester(
-		func(p defs.StaticSourceParent) defs.StaticSource {
-			return &Source{
-				ReadTimeout:    conf.Duration(10 * time.Second),
-				WriteTimeout:   conf.Duration(10 * time.Second),
-				WriteQueueSize: 2048,
-				Parent:         p,
-			}
-		},
-		"rtsp://testuser:@127.0.0.1:8555/teststream",
-		&conf.Path{
-			RTSPTransport: sp,
-		},
-	)
-	defer te.Close()
+	p := &test.StaticSourceParent{}
+	p.Initialize()
+	defer p.Close()
 
-	<-te.Unit
+	so := &Source{
+		ReadTimeout:    conf.Duration(10 * time.Second),
+		WriteTimeout:   conf.Duration(10 * time.Second),
+		WriteQueueSize: 2048,
+		Parent:         p,
+	}
+
+	done := make(chan struct{})
+	defer func() { <-done }()
+
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
+	go func() {
+		so.Run(defs.StaticSourceRunParams{ //nolint:errcheck
+			Context:        ctx,
+			ResolvedSource: "rtsp://testuser:@127.0.0.1:8555/teststream",
+			Conf: &conf.Path{
+				RTSPTransport:          sp,
+				RTSPUDPSourcePortRange: []uint{10000, 65535},
+			},
+		})
+		close(done)
+	}()
+
+	<-p.Unit
 }
 
-func TestSourceRange(t *testing.T) {
+func TestRange(t *testing.T) {
 	for _, ca := range []string{"clock", "npt", "smpte"} {
 		t.Run(ca, func(t *testing.T) {
 			var strm *gortsplib.ServerStream
@@ -334,7 +363,9 @@ func TestSourceRange(t *testing.T) {
 			require.NoError(t, err)
 			defer strm.Close()
 
-			cnf := &conf.Path{}
+			cnf := &conf.Path{
+				RTSPUDPSourcePortRange: []uint{10000, 65535},
+			}
 
 			switch ca {
 			case "clock":
@@ -350,21 +381,205 @@ func TestSourceRange(t *testing.T) {
 				cnf.RTSPRangeStart = "130s"
 			}
 
-			te := test.NewSourceTester(
-				func(p defs.StaticSourceParent) defs.StaticSource {
-					return &Source{
-						ReadTimeout:    conf.Duration(10 * time.Second),
-						WriteTimeout:   conf.Duration(10 * time.Second),
-						WriteQueueSize: 2048,
-						Parent:         p,
-					}
-				},
-				"rtsp://127.0.0.1:8555/teststream",
-				cnf,
-			)
-			defer te.Close()
+			p := &test.StaticSourceParent{}
+			p.Initialize()
+			defer p.Close()
 
-			<-te.Unit
+			so := &Source{
+				ReadTimeout:    conf.Duration(10 * time.Second),
+				WriteTimeout:   conf.Duration(10 * time.Second),
+				WriteQueueSize: 2048,
+				Parent:         p,
+			}
+
+			done := make(chan struct{})
+			defer func() { <-done }()
+
+			ctx, ctxCancel := context.WithCancel(context.Background())
+			defer ctxCancel()
+
+			go func() {
+				so.Run(defs.StaticSourceRunParams{ //nolint:errcheck
+					Context:        ctx,
+					ResolvedSource: "rtsp://127.0.0.1:8555/teststream",
+					Conf:           cnf,
+				})
+				close(done)
+			}()
+
+			<-p.Unit
 		})
 	}
+}
+
+func TestSkipBackChannel(t *testing.T) {
+	media0 := test.UniqueMediaH264()
+	media1 := test.UniqueMediaMPEG4Audio()
+	backChannelMedia := &description.Media{
+		Type:          description.MediaTypeAudio,
+		Formats:       []format.Format{&format.Opus{PayloadTyp: 96, ChannelCount: 2}},
+		IsBackChannel: true,
+	}
+
+	var strm *gortsplib.ServerStream
+	setupCount := 0
+
+	s := gortsplib.Server{
+		Handler: &testServer{
+			onDescribe: func(_ *gortsplib.ServerHandlerOnDescribeCtx) (*base.Response, *gortsplib.ServerStream, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onSetup: func(_ *gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error) {
+				setupCount++
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onPlay: func(_ *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error) {
+				go func() {
+					time.Sleep(100 * time.Millisecond)
+					err := strm.WritePacketRTP(media0, &rtp.Packet{
+						Header: rtp.Header{
+							Version:        0x02,
+							PayloadType:    96,
+							SequenceNumber: 57899,
+							Timestamp:      345234345,
+							SSRC:           978651231,
+							Marker:         true,
+						},
+						Payload: []byte{5, 1, 2, 3, 4},
+					})
+					require.NoError(t, err)
+				}()
+
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, nil
+			},
+		},
+		RTSPAddress: "127.0.0.1:8555",
+	}
+
+	err := s.Start()
+	require.NoError(t, err)
+	defer s.Close()
+
+	strm = &gortsplib.ServerStream{
+		Server: &s,
+		Desc:   &description.Session{Medias: []*description.Media{media0, media1, backChannelMedia}},
+	}
+	err = strm.Initialize()
+	require.NoError(t, err)
+	defer strm.Close()
+
+	var sp conf.RTSPTransport
+	sp.UnmarshalJSON([]byte(`"tcp"`)) //nolint:errcheck
+
+	p := &test.StaticSourceParent{}
+	p.Initialize()
+	defer p.Close()
+
+	so := &Source{
+		ReadTimeout:    conf.Duration(10 * time.Second),
+		WriteTimeout:   conf.Duration(10 * time.Second),
+		WriteQueueSize: 2048,
+		Parent:         p,
+	}
+
+	done := make(chan struct{})
+	defer func() { <-done }()
+
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
+	go func() {
+		so.Run(defs.StaticSourceRunParams{ //nolint:errcheck
+			Context:        ctx,
+			ResolvedSource: "rtsp://127.0.0.1:8555/teststream",
+			Conf: &conf.Path{
+				RTSPTransport:          conf.RTSPTransport{Protocol: ptrOf(gortsplib.ProtocolTCP)},
+				RTSPUDPSourcePortRange: []uint{10000, 65535},
+			},
+		})
+		close(done)
+	}()
+
+	<-p.Unit
+
+	require.Equal(t, 2, setupCount)
+}
+
+func TestOnlyBackChannelsError(t *testing.T) {
+	backChannelMedia1 := &description.Media{
+		Type:          description.MediaTypeAudio,
+		Formats:       []format.Format{&format.Opus{PayloadTyp: 96, ChannelCount: 2}},
+		IsBackChannel: true,
+	}
+	backChannelMedia2 := &description.Media{
+		Type:          description.MediaTypeAudio,
+		Formats:       []format.Format{&format.G711{PayloadTyp: 8, SampleRate: 8000, ChannelCount: 1}},
+		IsBackChannel: true,
+	}
+
+	var strm *gortsplib.ServerStream
+
+	s := gortsplib.Server{
+		Handler: &testServer{
+			onDescribe: func(_ *gortsplib.ServerHandlerOnDescribeCtx) (*base.Response, *gortsplib.ServerStream, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onSetup: func(_ *gortsplib.ServerHandlerOnSetupCtx) (*base.Response, *gortsplib.ServerStream, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, strm, nil
+			},
+			onPlay: func(_ *gortsplib.ServerHandlerOnPlayCtx) (*base.Response, error) {
+				return &base.Response{
+					StatusCode: base.StatusOK,
+				}, nil
+			},
+		},
+		RTSPAddress: "127.0.0.1:8555",
+	}
+
+	err := s.Start()
+	require.NoError(t, err)
+	defer s.Close()
+
+	strm = &gortsplib.ServerStream{
+		Server: &s,
+		Desc:   &description.Session{Medias: []*description.Media{backChannelMedia1, backChannelMedia2}},
+	}
+	err = strm.Initialize()
+	require.NoError(t, err)
+	defer strm.Close()
+
+	p := &test.StaticSourceParent{}
+	p.Initialize()
+
+	so := &Source{
+		ReadTimeout:    conf.Duration(10 * time.Second),
+		WriteTimeout:   conf.Duration(10 * time.Second),
+		WriteQueueSize: 2048,
+		Parent:         p,
+	}
+
+	ctx, ctxCancel := context.WithCancel(context.Background())
+	defer ctxCancel()
+
+	err = so.Run(defs.StaticSourceRunParams{
+		Context:        ctx,
+		ResolvedSource: "rtsp://127.0.0.1:8555/teststream",
+		Conf: &conf.Path{
+			RTSPTransport:          conf.RTSPTransport{Protocol: ptrOf(gortsplib.ProtocolTCP)},
+			RTSPUDPSourcePortRange: []uint{10000, 65535},
+		},
+	})
+
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "no media")
 }
